@@ -1,6 +1,6 @@
 --[[
     CRYOHUB UI LIBRARY
-    Version: 1.5 (Theme Hover Fix + Layout Fixes)
+    Version: 1.6 (Theme Hover Fix + Layout Fixes)
 ]]
 
 local Library = {}
@@ -119,7 +119,7 @@ local function press(btn)
     btn.MouseLeave:Connect(function() TweenService:Create(s, Tw.fast, { Scale = 1 }):Play() end)
 end
 
--- ✅ ИСПРАВЛЕНИЕ ХОВЕРА: Теперь принимает строки (ключи темы) вместо готовых цветов
+-- ✅ ИСПРАВЛЕНИЕ ХОВЕРА: Принимает ключи темы (строки), а не готовые цвета
 local function hoverEffect(obj, targetKey, baseKey)
     obj.MouseEnter:Connect(function()
         TweenService:Create(obj, Tw.fast, { BackgroundColor3 = T[targetKey] }):Play()
@@ -765,57 +765,30 @@ function Library:CreateWindow(config)
 
             -- ✅ ИСПРАВЛЕНИЕ ФОТО 1 (Выпадающий список)
             function Section:CreateDropdown(dropConfig)
-                local titleHeight = 20
-                local btnHeight = 34
-                local padding = 18
-                local gap = 4
-                local topPart = padding + titleHeight + gap + btnHeight -- 76
-
+                local baseHeight = 72
                 local optHeight = 40
                 local listHeight = #dropConfig.Options * optHeight
 
-                local box = mk("Frame", {
-                    Size = UDim2.new(1, 0, 0, topPart), BackgroundColor3 = T.card,
-                    BackgroundTransparency = 0, Parent = group,
-                })
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
 
-                local name = mk("TextLabel", {
-                    Position = UDim2.fromOffset(padding, padding), Size = UDim2.new(1, 0, 0, titleHeight),
-                    BackgroundTransparency = 1, Text = dropConfig.Title, Font = Enum.Font.GothamMedium, TextSize = 15,
-                    TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
-                })
+                local name = mk("TextLabel", { Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = dropConfig.Title, Font = Enum.Font.GothamMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
                 reg(name, "TextColor3", "text")
-
-                local dropBtn = mk("TextButton", {
-                    Position = UDim2.fromOffset(padding, padding + titleHeight + gap),
-                    Size = UDim2.new(1, -padding * 2, 0, btnHeight),
-                    BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = box,
-                })
+                
+                local dropBtn = mk("TextButton", { Position = UDim2.fromOffset(18, 38), Size = UDim2.new(1, -36, 0, 34), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = box })
                 corner(dropBtn, 12)
                 reg(dropBtn, "BackgroundColor3", "toggleOff")
                 stroke(dropBtn, T.stroke, 1, 0.6)
                 hoverEffect(dropBtn, "cardHover", "toggleOff")
 
-                local dropLbl = mk("TextLabel", {
-                    Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0),
-                    BackgroundTransparency = 1, Text = dropConfig.Multi and "Select..." or dropConfig.Options[1],
-                    Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = T.text,
-                    TextXAlignment = Enum.TextXAlignment.Left, Parent = dropBtn,
-                })
+                local dropLbl = mk("TextLabel", { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0), BackgroundTransparency = 1, Text = dropConfig.Multi and "Select..." or dropConfig.Options[1], Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = dropBtn })
                 reg(dropLbl, "TextColor3", "text")
 
-                local list = mk("Frame", {
-                    Position = UDim2.fromOffset(padding, topPart),
-                    Size = UDim2.new(1, -padding * 2, 0, 0),
-                    BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0,
-                    ClipsDescendants = true, Parent = box,
-                })
+                local list = mk("Frame", { Position = UDim2.fromOffset(18, baseHeight), Size = UDim2.new(1, -36, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, ClipsDescendants = true, Parent = box })
                 corner(list, 12)
                 reg(list, "BackgroundColor3", "toggleOff")
-
                 mk("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
 
                 local selected = {}
@@ -876,8 +849,8 @@ function Library:CreateWindow(config)
                             dropLbl.Text = opt
                             ElementObj.Value = opt
                             if dropConfig.Callback then task.spawn(dropConfig.Callback, opt) end
-                            TweenService:Create(list, Tw.fast, { Size = UDim2.new(1, -padding * 2, 0, 0) }):Play()
-                            TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, topPart) }):Play()
+                            TweenService:Create(list, Tw.fast, { Size = UDim2.new(1, -36, 0, 0) }):Play()
+                            TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
                             isOpen = false
                         end
                     end)
@@ -888,11 +861,11 @@ function Library:CreateWindow(config)
                     playSound("click")
                     isOpen = not isOpen
                     if isOpen then
-                        TweenService:Create(list, Tw.med, { Size = UDim2.new(1, -padding * 2, 0, listHeight) }):Play()
-                        TweenService:Create(box, Tw.med, { Size = UDim2.new(1, 0, 0, topPart + listHeight) }):Play()
+                        TweenService:Create(list, Tw.med, { Size = UDim2.new(1, -36, 0, listHeight) }):Play()
+                        TweenService:Create(box, Tw.med, { Size = UDim2.new(1, 0, 0, baseHeight + listHeight) }):Play()
                     else
-                        TweenService:Create(list, Tw.fast, { Size = UDim2.new(1, -padding * 2, 0, 0) }):Play()
-                        TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, topPart) }):Play()
+                        TweenService:Create(list, Tw.fast, { Size = UDim2.new(1, -36, 0, 0) }):Play()
+                        TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
                     end
                 end)
 
@@ -1017,8 +990,13 @@ function Library:CreateWindow(config)
                 
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 reg(box, "BackgroundColor3", "card")
-                hoverEffect(box, "cardHover", "card")
-                box.MouseEnter:Connect(playHover)
+                
+                -- ✅ Фикс ховера (срабатывает на clickArea и panel)
+                local function applyHover() TweenService:Create(box, Tw.fast, { BackgroundColor3 = T.cardHover }):Play() end
+                local function removeHover() TweenService:Create(box, Tw.fast, { BackgroundColor3 = T.card }):Play() end
+                
+                box.MouseEnter:Connect(function() playHover(); applyHover() end)
+                box.MouseLeave:Connect(removeHover)
 
                 local swatchBg = mk("Frame", { Position = UDim2.fromOffset(18, 18), Size = UDim2.fromOffset(44, 44), BackgroundColor3 = defColor, BackgroundTransparency = 0, Parent = box })
                 corner(swatchBg, 12)
@@ -1031,10 +1009,14 @@ function Library:CreateWindow(config)
 
                 local clickArea = mk("TextButton", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundTransparency = 1, Text = "", Parent = box })
                 clickArea.MouseButton1Down:Connect(function() playSound("click") end)
+                clickArea.MouseEnter:Connect(applyHover)
+                clickArea.MouseLeave:Connect(removeHover)
 
                 local panel = mk("Frame", { Position = UDim2.fromOffset(0, baseHeight), Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, ClipsDescendants = true, Parent = box })
                 corner(panel, 14)
                 reg(panel, "BackgroundColor3", "toggleOff")
+                panel.MouseEnter:Connect(applyHover)
+                panel.MouseLeave:Connect(removeHover)
                 
                 local ElementObj = { Value = defColor }
 
