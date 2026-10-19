@@ -1,12 +1,12 @@
 -- ============================================================
---  CRYOHUB STEAM EDITION — LIBRARY v1.0.0
---  Public API + Steam Edition visuals
+--  CRYOHUB STEAM EDITION — LIBRARY v1.1.0
+--  Full fixed code (all bugs resolved)
 -- ============================================================
 
 local Library = {}
 Library.Flags = {}
 Library.Dependencies = {}
-Library.Version = "1.0.0-Steam"
+Library.Version = "1.1.0-Steam"
 
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
@@ -214,7 +214,7 @@ local function processDependencies()
 end
 
 -- ============================================================
---  ROW EDGE ROUNDING (per-corner masks for perfect hover)
+--  ROW EDGE ROUNDING & TRACKER
 -- ============================================================
 local function addMasks(row, radius, side)
     local mSize = UDim2.fromOffset(radius, radius)
@@ -235,12 +235,11 @@ local function addMasks(row, radius, side)
         table.insert(masks, makeMask(Vector2.new(0, 0), 0, 0))
         table.insert(masks, makeMask(Vector2.new(1, 0), 1, 0))
     end
-    local conn = row:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
+    row:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
         for _, m in ipairs(masks) do
             if m.Parent then m.BackgroundColor3 = row.BackgroundColor3 end
         end
     end)
-    return conn
 end
 
 local function addRowSeparator(row)
@@ -254,12 +253,6 @@ local function addRowSeparator(row)
 end
 
 local function applyRowStyle(row, isFirst, isLast)
-    local prevFirst = row:GetAttribute("__isFirst")
-    local prevLast  = row:GetAttribute("__isLast")
-    if prevFirst == isFirst and prevLast == isLast then return end
-    row:SetAttribute("__isFirst", isFirst)
-    row:SetAttribute("__isLast", isLast)
-
     local c = row:FindFirstChildOfClass("UICorner"); if c then c:Destroy() end
     for _, m in ipairs(row:GetChildren()) do
         if m.Name == "__cornerMask" then m:Destroy() end
@@ -279,13 +272,32 @@ local function applyRowStyle(row, isFirst, isLast)
     if not isLast then addRowSeparator(row) end
 end
 
-local function attachRowTracker(group)
+local function attachRowTracker(group, sectionName)
     local rows = {}
     local function refresh()
-        for i, row in ipairs(rows) do
-            if row.Parent then applyRowStyle(row, i == 1, i == #rows) end
+        -- Удаляем уничтоженные элементы
+        for i = #rows, 1, -1 do
+            if not rows[i].Parent then table.remove(rows, i) end
+        end
+        
+        if #rows == 1 then
+            -- ✅ Предупреждение и авто-конвертация в одиночную карточку
+            warn("[CryoHub] Секция '" .. tostring(sectionName) .. "' содержит только 1 элемент! Авто-конвертация в одиночную карточку. Добавьте 2+ элемента для создания группы.")
+            group.BackgroundTransparency = 1
+            local grpStroke = group:FindFirstChildOfClass("UIStroke")
+            if grpStroke then grpStroke.Transparency = 1 end
+            applyRowStyle(rows[1], true, true)
+        elseif #rows >= 2 then
+            -- ✅ Возврат к обычной группе
+            group.BackgroundTransparency = 0
+            local grpStroke = group:FindFirstChildOfClass("UIStroke")
+            if grpStroke then grpStroke.Transparency = 0.55 end
+            for i, row in ipairs(rows) do
+                applyRowStyle(row, i == 1, i == #rows)
+            end
         end
     end
+    
     local function tryTrack(child)
         if child:IsA("TextButton") or (child:IsA("Frame") and not child:IsA("TextButton")) then
             if child.LayoutOrder and child.LayoutOrder > 0 then
@@ -294,6 +306,7 @@ local function attachRowTracker(group)
             end
         end
     end
+    
     for _, child in ipairs(group:GetChildren()) do tryTrack(child) end
     group.ChildAdded:Connect(tryTrack)
     group.ChildRemoved:Connect(function(child)
@@ -472,7 +485,6 @@ function Library:CreateWindow(config)
         end
     end
 
-    -- Clamp helper
     local function clampRootPosition()
         local vp = workspace.CurrentCamera.ViewportSize
         local sz = root.AbsoluteSize
@@ -535,7 +547,7 @@ function Library:CreateWindow(config)
             corner(group, 16); local gs = stroke(group, T.stroke, 1.2, 0.55)
             reg(group, "BackgroundColor3", "card"); reg(gs, "Color", "stroke")
             mk("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder, Parent = group })
-            attachRowTracker(group)
+            attachRowTracker(group, name)
 
             local Section = { Group = group, _nextOrder = 0, _scroll = scroll }
             local function nextOrder() Section._nextOrder += 1; return Section._nextOrder end
@@ -557,7 +569,7 @@ function Library:CreateWindow(config)
                 local state = cfg.Default or false
                 local callback = cfg.Callback
 
-                local row = mk("TextButton", { Size = UDim2.new(1, 0, 0, desc and 62 or 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, LayoutOrder = nextOrder(), Parent = group })
+                local row = mk("TextButton", { Size = UDim2.new(1, 0, 0, desc and 62 or 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
                 reg(row, "BackgroundColor3", "card")
                 hoverEffect(row, "cardHover", "card")
                 row.MouseEnter:Connect(playHover)
@@ -614,7 +626,8 @@ function Library:CreateWindow(config)
                 local default = cfg.Default or min
                 local callback = cfg.Callback
 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                -- ✅ ClipsDescendants для ровных углов
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -671,7 +684,7 @@ function Library:CreateWindow(config)
                 local placeholder = cfg.Placeholder or ""
                 local callback = cfg.Callback
 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -714,7 +727,7 @@ function Library:CreateWindow(config)
                 local optHeight = 40
                 local listHeight = #options * optHeight
 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -839,7 +852,7 @@ function Library:CreateWindow(config)
                 local label = cfg.Title or "Button"
                 local isDanger = cfg.Danger or false
 
-                local btn = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = label, FontFace = FontBold, TextSize = 15, TextColor3 = isDanger and T.red or T.text, AutoButtonColor = false, LayoutOrder = nextOrder(), Parent = group })
+                local btn = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = label, FontFace = FontBold, TextSize = 15, TextColor3 = isDanger and T.red or T.text, AutoButtonColor = false, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
                 reg(btn, "BackgroundColor3", "card")
                 hoverEffect(btn, "cardHover", "card")
                 btn.MouseEnter:Connect(playHover)
@@ -856,7 +869,7 @@ function Library:CreateWindow(config)
                 local default = cfg.Default or Enum.KeyCode.Unknown
                 local callback = cfg.Callback
 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -898,11 +911,15 @@ function Library:CreateWindow(config)
                 local title = cfg.Title or "Color"
                 local default = cfg.Default or Color3.fromRGB(255, 255, 255)
                 local callback = cfg.Callback
-                local baseHeight, sliderRowHeight, padding = 80, 44, 12
-                local panelHeight = padding + sliderRowHeight * 3 + padding
+                
+                -- ✅ Увеличен padding и panelHeight, чтобы слайдеры не прилипали к низу
+                local baseHeight, sliderRowHeight, padding = 80, 44, 14
+                local panelHeight = padding + sliderRowHeight * 3 + 20 
+                
                 local curR, curG, curB = default.R * 255, default.G * 255, default.B * 255
 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                -- ✅ ClipsDescendants, чтобы нижние углы обрезались ровно
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -918,7 +935,7 @@ function Library:CreateWindow(config)
                 clickArea.MouseButton1Down:Connect(function() playSound("click") end)
 
                 local panel = mk("Frame", { Position = UDim2.fromOffset(0, baseHeight), Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, ClipsDescendants = true, Parent = box })
-                corner(panel, 14); reg(panel, "BackgroundColor3", "toggleOff")
+                corner(panel, 16); reg(panel, "BackgroundColor3", "toggleOff")
 
                 local ElementObj = { Value = default }
                 local function updateColor()
@@ -983,15 +1000,21 @@ function Library:CreateWindow(config)
     end
 
     -- ============ FLOATING BUTTON ============
+    -- ✅ Авто-ширина кнопки, чтобы текст не вылезал
     local floatBtn = mk("TextButton", {
-        Name = "FloatToggle", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14),
-        Size = UDim2.fromOffset(108, 44), BackgroundColor3 = T.card, BackgroundTransparency = 1,
+        Name = "FloatToggle", AnchorPoint = Vector2.new(0.5, 0),
+        Position = UDim2.new(0.5, 0, 0, 14),
+        Size = UDim2.new(0, 0, 0, 44), AutomaticSize = Enum.AutomaticSize.X,
+        BackgroundColor3 = T.card, BackgroundTransparency = 1,
         Text = "", AutoButtonColor = false, Visible = false, ZIndex = 10, Parent = gui,
     })
     corner(floatBtn, 22)
+    mk("UIPadding", { PaddingLeft = UDim.new(0, 46), PaddingRight = UDim.new(0, 16), Parent = floatBtn })
+    
     local fStroke = stroke(floatBtn, T.accent, 1.5, 1); reg(fStroke, "Color", "accent")
     local floatIcon = mk("ImageLabel", { Size = UDim2.fromOffset(config.FloatIconSize or 22, config.FloatIconSize or 22), AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0.5, 0), BackgroundTransparency = 1, Image = FloatIcon, ImageColor3 = T.accent, ZIndex = 11, Parent = floatBtn })
-    local floatText = mk("TextLabel", { Position = UDim2.fromOffset(46, 0), Size = UDim2.new(1, -50, 1, 0), BackgroundTransparency = 1, Text = Title, FontFace = FontBold, TextSize = 12, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11, Parent = floatBtn })
+    
+    local floatText = mk("TextLabel", { Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, Text = Title, FontFace = FontBold, TextSize = 12, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11, Parent = floatBtn })
     reg(floatText, "TextColor3", "text")
 
     task.spawn(function()
@@ -1038,7 +1061,7 @@ function Library:CreateWindow(config)
     end
     floatBtn.MouseButton1Click:Connect(function() toggleUI(true) end)
 
-    -- Minimize button (hides sidebar/content so titleBar receives drags)
+    -- Minimize button
     btnMin.MouseButton1Click:Connect(function()
         if toggling or hidden then return end
         minimized = not minimized
@@ -1048,32 +1071,33 @@ function Library:CreateWindow(config)
         task.delay(0.3, clampRootPosition)
     end)
 
-    -- Close confirmation
-    local confirmOverlay = mk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Visible = false, ZIndex = 20, Parent = root })
-    local confirmBox = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(340, 160), BackgroundColor3 = T.card, BackgroundTransparency = 0, ZIndex = 21, Parent = confirmOverlay })
+    -- ✅ Confirmation Overlay (Parent = gui, not root — so it's not clipped by minimized window)
+    local confirmOverlay = mk("Frame", {
+        Name = "ConfirmOverlay", Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1,
+        Visible = false, ZIndex = 30, Parent = gui,
+    })
+    local confirmBox = mk("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(340, 160), BackgroundColor3 = T.card,
+        BackgroundTransparency = 0, ZIndex = 31, Parent = confirmOverlay,
+    })
     corner(confirmBox, 20); stroke(confirmBox, T.red, 1.5, 0.3); reg(confirmBox, "BackgroundColor3", "card")
+    
     mk("ImageLabel", { Position = UDim2.fromOffset(20, 20), Size = UDim2.fromOffset(32, 32), BackgroundTransparency = 1, Image = ICONS.Warning, ImageColor3 = T.red, Parent = confirmBox })
     mk("TextLabel", { Position = UDim2.fromOffset(64, 22), Size = UDim2.new(1, -70, 0, 24), BackgroundTransparency = 1, Text = "Close Interface?", FontFace = FontBold, TextSize = 18, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = confirmBox })
     mk("TextLabel", { Position = UDim2.fromOffset(64, 48), Size = UDim2.new(1, -70, 0, 20), BackgroundTransparency = 1, Text = "You'll need to re-execute the script.", FontFace = FontRegular, TextSize = 12, TextColor3 = T.textDim, TextXAlignment = Enum.TextXAlignment.Left, Parent = confirmBox })
+    
     local btnYes = mk("TextButton", { Position = UDim2.fromOffset(20, 100), Size = UDim2.fromOffset(140, 40), BackgroundColor3 = T.red, BackgroundTransparency = 0, Text = "Yes, close", FontFace = FontBold, TextSize = 14, TextColor3 = T.text, AutoButtonColor = false, Parent = confirmBox })
     corner(btnYes, 12); reg(btnYes, "BackgroundColor3", "red")
     hoverEffect(btnYes, "redBright", "red"); btnYes.MouseButton1Down:Connect(function() playSound("click") end)
+    
     local btnNo = mk("TextButton", { Position = UDim2.fromOffset(180, 100), Size = UDim2.fromOffset(140, 40), BackgroundColor3 = T.cardHover, BackgroundTransparency = 0, Text = "Cancel", FontFace = FontBold, TextSize = 14, TextColor3 = T.text, AutoButtonColor = false, Parent = confirmBox })
     corner(btnNo, 12); reg(btnNo, "BackgroundColor3", "cardHover")
     hoverEffect(btnNo, "card", "cardHover"); btnNo.MouseButton1Down:Connect(function() playSound("click") end)
 
-    -- ✅ FIX: если окно свёрнуто — сначала разворачиваем, чтобы диалог поместился
-    local confirmRestoreMinimized = false
     btnClose.MouseButton1Click:Connect(function()
         if toggling or hidden then return end
-        confirmRestoreMinimized = minimized
-        if minimized then
-            minimized = false
-            sidebar.Visible = true
-            content.Visible = true
-            root.Size = UDim2.fromOffset(ROOT_W, ROOT_H)  -- мгновенно, без твина
-            task.delay(0.05, clampRootPosition)
-        end
         confirmOverlay.Visible = true; confirmOverlay.BackgroundTransparency = 1
         TweenService:Create(confirmOverlay, Tw.fast, { BackgroundTransparency = 0.45 }):Play()
         confirmBox.Size = UDim2.fromOffset(0, 0)
@@ -1081,18 +1105,7 @@ function Library:CreateWindow(config)
     end)
     btnNo.MouseButton1Click:Connect(function()
         local t = TweenService:Create(confirmOverlay, Tw.fast, { BackgroundTransparency = 1 })
-        t:Play(); t.Completed:Connect(function()
-            confirmOverlay.Visible = false
-            -- ✅ Если окно было свёрнуто до клика — возвращаем в свёрнутое состояние
-            if confirmRestoreMinimized then
-                confirmRestoreMinimized = false
-                minimized = true
-                sidebar.Visible = false
-                content.Visible = false
-                TweenService:Create(root, Tw.med, { Size = UDim2.fromOffset(ROOT_W, TITLE_H) }):Play()
-                task.delay(0.3, clampRootPosition)
-            end
-        end)
+        t:Play(); t.Completed:Connect(function() confirmOverlay.Visible = false end)
     end)
     btnYes.MouseButton1Click:Connect(function()
         playSound("close"); confirmOverlay.Visible = false
@@ -1100,7 +1113,7 @@ function Library:CreateWindow(config)
         task.delay(0.25, function() gui:Destroy() end)
     end)
 
-    -- Drag (works even when minimized)
+    -- Drag
     local dragging, dragStart, startPos = false, nil, nil
     titleBar.InputBegan:Connect(function(input)
         if not loaded then return end
