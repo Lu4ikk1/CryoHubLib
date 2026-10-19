@@ -1062,8 +1062,18 @@ function Library:CreateWindow(config)
     corner(btnNo, 12); reg(btnNo, "BackgroundColor3", "cardHover")
     hoverEffect(btnNo, "card", "cardHover"); btnNo.MouseButton1Down:Connect(function() playSound("click") end)
 
+    -- ✅ FIX: если окно свёрнуто — сначала разворачиваем, чтобы диалог поместился
+    local confirmRestoreMinimized = false
     btnClose.MouseButton1Click:Connect(function()
-        if toggling then return end
+        if toggling or hidden then return end
+        confirmRestoreMinimized = minimized
+        if minimized then
+            minimized = false
+            sidebar.Visible = true
+            content.Visible = true
+            root.Size = UDim2.fromOffset(ROOT_W, ROOT_H)  -- мгновенно, без твина
+            task.delay(0.05, clampRootPosition)
+        end
         confirmOverlay.Visible = true; confirmOverlay.BackgroundTransparency = 1
         TweenService:Create(confirmOverlay, Tw.fast, { BackgroundTransparency = 0.45 }):Play()
         confirmBox.Size = UDim2.fromOffset(0, 0)
@@ -1071,7 +1081,18 @@ function Library:CreateWindow(config)
     end)
     btnNo.MouseButton1Click:Connect(function()
         local t = TweenService:Create(confirmOverlay, Tw.fast, { BackgroundTransparency = 1 })
-        t:Play(); t.Completed:Connect(function() confirmOverlay.Visible = false end)
+        t:Play(); t.Completed:Connect(function()
+            confirmOverlay.Visible = false
+            -- ✅ Если окно было свёрнуто до клика — возвращаем в свёрнутое состояние
+            if confirmRestoreMinimized then
+                confirmRestoreMinimized = false
+                minimized = true
+                sidebar.Visible = false
+                content.Visible = false
+                TweenService:Create(root, Tw.med, { Size = UDim2.fromOffset(ROOT_W, TITLE_H) }):Play()
+                task.delay(0.3, clampRootPosition)
+            end
+        end)
     end)
     btnYes.MouseButton1Click:Connect(function()
         playSound("close"); confirmOverlay.Visible = false
