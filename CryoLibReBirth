@@ -1,6 +1,6 @@
 --[[
     CRYOHUB UI LIBRARY
-    Version: 1.0
+    Version: 1.1 (Anti-Shake Fix + Missing Elements)
     Author: CryoHub
     Description: A sleek, animated, MD3/Steam inspired UI library.
 ]]
@@ -128,7 +128,8 @@ end
 
 local function getAdaptiveScale()
     local vp = workspace.CurrentCamera.ViewportSize
-    return math.max(math.min(vp.X / 820, vp.Y / 620, 1), 0.55)
+    -- Округляем до 2 знаков, чтобы избежать пиксельного дрожания
+    return math.floor(math.max(math.min(vp.X / 820, vp.Y / 620, 1), 0.55) * 100) / 100
 end
 
 -- ============================================================
@@ -243,10 +244,10 @@ function Library:CreateWindow(config)
     local TITLE_H, SIDEBAR_W = 56, 190
 
     -- Root
-    local root = mk("CanvasGroup", {
+    local root = mk("Frame", {
         Name = "Root", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
         Size = UDim2.fromOffset(ROOT_W, ROOT_H), BackgroundColor3 = T.bg, BackgroundTransparency = 0,
-        BorderSizePixel = 0, ClipsDescendants = true, GroupTransparency = 1, Visible = false, Parent = gui,
+        BorderSizePixel = 0, ClipsDescendants = true, Visible = false, Parent = gui,
     })
     corner(root, 22)
     reg(root, "BackgroundColor3", "bg")
@@ -358,7 +359,7 @@ function Library:CreateWindow(config)
         local btnCenter = floatBtn.AbsolutePosition + floatBtn.AbsoluteSize * 0.5
         if not hidden then
             lastPos = root.Position
-            local t = TweenService:Create(root, Tw.slow, { Position = UDim2.fromOffset(btnCenter.X, btnCenter.Y), GroupTransparency = 1 })
+            local t = TweenService:Create(root, Tw.slow, { Position = UDim2.fromOffset(btnCenter.X, btnCenter.Y) })
             TweenService:Create(uiScale, Tw.slow, { Scale = 0.05 }):Play()
             t:Play()
             t.Completed:Connect(function()
@@ -367,8 +368,8 @@ function Library:CreateWindow(config)
                 floatText.Text = "Show"
             end)
         else
-            root.Visible = true; root.Position = UDim2.fromOffset(btnCenter.X, btnCenter.Y); root.GroupTransparency = 1; uiScale.Scale = 0.05
-            local t = TweenService:Create(root, Tw.slow, { Position = lastPos, GroupTransparency = 0 })
+            root.Visible = true; root.Position = UDim2.fromOffset(btnCenter.X, btnCenter.Y); uiScale.Scale = 0.05
+            local t = TweenService:Create(root, Tw.slow, { Position = lastPos })
             TweenService:Create(uiScale, Tw.slow, { Scale = getAdaptiveScale() }):Play()
             t:Play()
             t.Completed:Connect(function()
@@ -433,7 +434,7 @@ function Library:CreateWindow(config)
         TweenService:Create(floatBtn, Tw.fast, { BackgroundTransparency = 1 }):Play()
         TweenService:Create(floatIcon, Tw.fast, { ImageTransparency = 1 }):Play()
         TweenService:Create(floatText, Tw.fast, { TextTransparency = 1 }):Play()
-        local t = TweenService:Create(root, Tw.med, { GroupTransparency = 1 })
+        local t = TweenService:Create(root, Tw.med, { BackgroundTransparency = 1 })
         t:Play(); t.Completed:Connect(function() gui:Destroy() end)
     end
 
@@ -466,7 +467,7 @@ function Library:CreateWindow(config)
 
     -- Loading Screen
     local LOADING_W, LOADING_H = 460, 260
-    local loadingScreen = mk("CanvasGroup", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(LOADING_W, LOADING_H), BackgroundColor3 = T.card, BackgroundTransparency = 0, GroupTransparency = 1, ZIndex = 200, ClipsDescendants = true, Parent = gui })
+    local loadingScreen = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(LOADING_W, LOADING_H), BackgroundColor3 = T.card, BackgroundTransparency = 0, ZIndex = 200, ClipsDescendants = true, Parent = gui })
     corner(loadingScreen, 22); stroke(loadingScreen, T.stroke, 1.2, 0.55)
     
     local loadingScale = mk("UIScale", { Scale = 0.85 * getAdaptiveScale(), Parent = loadingScreen })
@@ -567,7 +568,8 @@ function Library:CreateWindow(config)
 
         self.Tabs[tabId] = { btn = btn, ico = ico, lbl = lbl }
 
-        local page = mk("CanvasGroup", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, GroupTransparency = 1, Visible = false, Parent = content })
+        -- ЗАМЕНЕНО С CanvasGroup НА Frame ДЛЯ УСТРАНЕНИЯ ТРЯСКИ
+        local page = mk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, Parent = content })
         local scroll = mk("ScrollingFrame", {
             Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 4,
             ScrollBarImageColor3 = T.stroke, ScrollBarImageTransparency = 0.4, CanvasSize = UDim2.new(0, 0, 0, 0),
@@ -585,11 +587,10 @@ function Library:CreateWindow(config)
             refreshSidebar()
             for pid, p in pairs(self.Pages) do
                 if pid == tabId then
-                    p.Visible = true; p.GroupTransparency = 1; p.Position = UDim2.fromOffset(8, 0)
-                    TweenService:Create(p, Tw.med, { GroupTransparency = 0, Position = UDim2.fromOffset(0, 0) }):Play()
+                    p.Visible = true; p.Position = UDim2.fromOffset(8, 0)
+                    TweenService:Create(p, Tw.med, { Position = UDim2.fromOffset(0, 0) }):Play()
                 else
-                    local t = TweenService:Create(p, Tw.fast, { GroupTransparency = 1 })
-                    t:Play(); t.Completed:Connect(function() if self.ActiveTab ~= pid then p.Visible = false end end)
+                    p.Visible = false
                 end
             end
         end)
@@ -597,7 +598,6 @@ function Library:CreateWindow(config)
         if not self.ActiveTab then
             self.ActiveTab = tabId
             page.Visible = true
-            page.GroupTransparency = 0
             refreshSidebar()
         end
 
@@ -610,7 +610,8 @@ function Library:CreateWindow(config)
             reg(sectionLabel, "TextColor3", "accent")
             table.insert(self.Elements, sectionLabel)
 
-            local group = mk("CanvasGroup", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = #self.Elements + 1, ClipsDescendants = true, Parent = self.Page })
+            -- ЗАМЕНЕНО С CanvasGroup НА Frame ДЛЯ УСТРАНЕНИЯ ТРЯСКИ
+            local group = mk("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = #self.Elements + 1, ClipsDescendants = true, Parent = self.Page })
             corner(group, 16)
             local grpStroke = stroke(group, T.stroke, 1.2, 0.55)
             reg(group, "BackgroundColor3", "card")
@@ -619,7 +620,6 @@ function Library:CreateWindow(config)
             table.insert(self.Elements, group)
 
             local rowCount = 0
-            local function getIsLast() return false end -- Handled dynamically
 
             -- Helper to add separators automatically
             local function addElement(el)
@@ -635,6 +635,24 @@ function Library:CreateWindow(config)
                         reg(sep, "BackgroundColor3", "stroke")
                     end
                 end
+            end
+
+            -- Paragraph / Text
+            function Section:CreateParagraph(parConfig)
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
+                reg(box, "BackgroundColor3", "card")
+                
+                local lbl = mk("TextLabel", {
+                    Size = UDim2.new(1, -36, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+                    Position = UDim2.fromOffset(18, 14), BackgroundTransparency = 1,
+                    Text = parConfig.Text, Font = Enum.Font.Gotham, TextSize = 13,
+                    TextColor3 = T.textDim, TextXAlignment = Enum.TextXAlignment.Left,
+                    TextWrapped = true, Parent = box
+                })
+                reg(lbl, "TextColor3", "textDim")
+
+                addElement(box)
+                return box
             end
 
             -- Toggle
@@ -835,7 +853,6 @@ function Library:CreateWindow(config)
                             dropLbl.Text = opt
                             ElementObj.Value = opt
                             if dropConfig.Callback then task.spawn(dropConfig.Callback, opt) end
-                            -- Close
                             TweenService:Create(list, Tw.fast, { Size = UDim2.new(1, -36, 0, 0) }):Play()
                             TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
                         end
@@ -854,6 +871,36 @@ function Library:CreateWindow(config)
                         TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
                     end
                 end)
+
+                addElement(box)
+                return ElementObj
+            end
+
+            -- Search / Filter
+            function Section:CreateSearch(searchConfig)
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
+                reg(box, "BackgroundColor3", "card")
+                hoverEffect(box, T.cardHover, T.card)
+                box.MouseEnter:Connect(playHover)
+
+                local name = mk("TextLabel", { Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = searchConfig.Title or "Search", Font = Enum.Font.GothamMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
+                reg(name, "TextColor3", "text")
+                
+                local field = mk("Frame", { Position = UDim2.fromOffset(18, 36), Size = UDim2.new(1, -36, 0, 34), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Parent = box })
+                corner(field, 12)
+                reg(field, "BackgroundColor3", "toggleOff")
+                stroke(field, T.stroke, 1, 0.6)
+
+                local textBox = mk("TextBox", { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = searchConfig.Placeholder or "Search...", PlaceholderColor3 = T.textDim, TextColor3 = T.text, Font = Enum.Font.Gotham, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, Parent = field })
+                reg(textBox, "TextColor3", "text")
+                reg(textBox, "PlaceholderColor3", "textDim")
+
+                field.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then textBox:CaptureFocus(); playSound("click") end end)
+                textBox:GetPropertyChangedSignal("Text"):Connect(function() if searchConfig.Callback then task.spawn(searchConfig.Callback, textBox.Text) end end)
+
+                local ElementObj = {}
+                function ElementObj:Set(val) textBox.Text = tostring(val) end
+                function ElementObj:Get() return textBox.Text end
 
                 addElement(box)
                 return ElementObj
@@ -1068,18 +1115,18 @@ function Library:CreateWindow(config)
 
     task.spawn(function()
         task.wait(0.2)
-        TweenService:Create(loadingScreen, Tw.med, { GroupTransparency = 0 }):Play()
+        TweenService:Create(loadingScreen, Tw.med, { BackgroundTransparency = 0 }):Play()
         TweenService:Create(loadingScale, Tw.med, { Scale = math.max(math.min(workspace.CurrentCamera.ViewportSize.X / 820, 1), 0.55) * 0.85 }):Play()
         task.wait(0.35)
         runLoading()
-        TweenService:Create(loadingScreen, Tw.med, { GroupTransparency = 1 }):Play()
+        TweenService:Create(loadingScreen, Tw.med, { BackgroundTransparency = 1 }):Play()
         TweenService:Create(loadingScale, Tw.med, { Scale = 0.5 }):Play()
         task.wait(0.3)
         loadingScreen:Destroy()
         
         loaded = true
-        root.Visible = true; root.GroupTransparency = 1; uiScale.Scale = 0.88
-        TweenService:Create(root, Tw.med, { GroupTransparency = 0 }):Play()
+        root.Visible = true; uiScale.Scale = 0.88
+        TweenService:Create(root, Tw.med, { BackgroundTransparency = 0 }):Play()
         TweenService:Create(uiScale, Tw.med, { Scale = getAdaptiveScale() }):Play()
         
         task.delay(0.35, function()
