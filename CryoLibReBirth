@@ -1,6 +1,6 @@
 --[[
     CRYOHUB UI LIBRARY
-    Version: 1.6 (Theme Hover Fix + Layout Fixes)
+    Version: 1.8 (Exact Monolith Port + Bouncy Press)
 ]]
 
 local Library = {}
@@ -60,28 +60,18 @@ local THEMES = {
     },
 }
 
-local T = THEMES.SteamDark
-local Regs = {}
-local function reg(el, prop, key)
-    table.insert(Regs, { el = el, prop = prop, key = key })
-end
-
-local function applyTheme(name)
-    if not THEMES[name] then return end
-    T = THEMES[name]
-    for _, r in ipairs(Regs) do
-        if r.el and r.el.Parent then
-            TweenService:Create(r.el, TweenInfo.new(0.28), { [r.prop] = T[r.key] }):Play()
-        end
-    end
-end
+local currentTheme = "SteamDark"
+local T = THEMES[currentTheme]
 
 local Tw = {
     fast  = TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
     med   = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
     slow  = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-    pressDown = TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-    pressUp   = TweenInfo.new(0.32, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out),
+    -- ✅ ИЗМЕНЕННАЯ АНИМАЦИЯ НАЖАТИЯ
+    pressDown = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    pressUp   = TweenInfo.new(0.4, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out),
+    water = TweenInfo.new(0.55, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+    waterIn = TweenInfo.new(0.65, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 }
 
 local ICONS = {
@@ -114,12 +104,12 @@ end
 
 local function press(btn)
     local s = btn:FindFirstChildOfClass("UIScale") or mk("UIScale", { Scale = 1, Parent = btn })
-    btn.MouseButton1Down:Connect(function() TweenService:Create(s, Tw.pressDown, { Scale = 0.96 }):Play() end)
+    btn.MouseButton1Down:Connect(function() TweenService:Create(s, Tw.pressDown, { Scale = 0.94 }):Play() end)
     btn.MouseButton1Up:Connect(function() TweenService:Create(s, Tw.pressUp, { Scale = 1 }):Play() end)
     btn.MouseLeave:Connect(function() TweenService:Create(s, Tw.fast, { Scale = 1 }):Play() end)
 end
 
--- ✅ ИСПРАВЛЕНИЕ ХОВЕРА: Принимает ключи темы (строки), а не готовые цвета
+-- ✅ Передает строковые ключи для динамической смены темы
 local function hoverEffect(obj, targetKey, baseKey)
     obj.MouseEnter:Connect(function()
         TweenService:Create(obj, Tw.fast, { BackgroundColor3 = T[targetKey] }):Play()
@@ -131,19 +121,36 @@ end
 
 local function getAdaptiveScale()
     local vp = workspace.CurrentCamera.ViewportSize
-    return math.floor(math.max(math.min(vp.X / 820, vp.Y / 620, 1), 0.55) * 100) / 100
+    local s = math.min(vp.X / 820, vp.Y / 620, 1)
+    return math.max(s, 0.55)
+end
+
+local regs = {}
+local function reg(el, prop, key)
+    regs[#regs + 1] = { el = el, prop = prop, key = key }
+end
+
+local function applyTheme(name)
+    if not THEMES[name] then return end
+    currentTheme = name
+    T = THEMES[name]
+    for _, r in ipairs(regs) do
+        if r.el and r.el.Parent then
+            TweenService:Create(r.el, Tw.med, { [r.prop] = T[r.key] }):Play()
+        end
+    end
 end
 
 -- ============================================================
 --  SOUNDS
 -- ============================================================
-local Sounds = {}
+local sounds = {}
 local function makeSound(name, id, vol)
     local s = Instance.new("Sound")
     s.SoundId = "rbxassetid://" .. id
     s.Volume = vol
     s.Parent = SoundService
-    Sounds[name] = s
+    sounds[name] = s
 end
 makeSound("click",   "6895079853",        0.4)
 makeSound("hover",   "107511012621133",   0.25)
@@ -157,7 +164,7 @@ local SoundEnabled = true
 
 local function playSound(name)
     if not SoundEnabled then return end
-    local s = Sounds[name]
+    local s = sounds[name]
     if s then s:Stop(); s:Play() end
 end
 local function playHover()
@@ -330,7 +337,7 @@ function Library:CreateWindow(config)
     local fStroke = stroke(floatBtn, T.accent, 1.5, 1)
     reg(fStroke, "Color", "accent")
 
-    local floatIcon = mk("ImageLabel", { Size = UDim2.fromOffset(22, 22), AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0.5, 0), BackgroundTransparency = 1, Image = FloatIcon, ImageColor3 = T.accent, ZIndex = 11, Parent = floatBtn })
+    local floatIcon = mk("ImageLabel", { Size = UDim2.fromOffset(config.FloatIconSize or 22, config.FloatIconSize or 22), AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 16, 0.5, 0), BackgroundTransparency = 1, Image = FloatIcon, ImageColor3 = T.accent, ZIndex = 11, Parent = floatBtn })
     local floatText = mk("TextLabel", { Position = UDim2.fromOffset(46, 0), Size = UDim2.new(1, -50, 1, 0), BackgroundTransparency = 1, Text = Title, Font = Enum.Font.GothamBold, TextSize = 12, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 11, Parent = floatBtn })
     reg(floatText, "TextColor3", "text")
     local floatScale = mk("UIScale", { Scale = 1, Parent = floatBtn })
@@ -605,49 +612,18 @@ function Library:CreateWindow(config)
 
             local rowCount = 0
 
-            local function addElement(el)
-                rowCount += 1
-                el.LayoutOrder = rowCount
-                table.insert(self.Elements, el)
-                
-                local prevChild = nil
-                for _, child in ipairs(group:GetChildren()) do
-                    if child:IsA("GuiObject") and child ~= el then
-                        if not prevChild or child.LayoutOrder > prevChild.LayoutOrder then
-                            prevChild = child
-                        end
-                    end
-                end
-                
-                if prevChild then
-                    local sep = prevChild:FindFirstChild("RowSep")
-                    if not sep then
-                        sep = mk("Frame", { Name = "RowSep", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = prevChild })
-                        reg(sep, "BackgroundColor3", "stroke")
-                    end
-                    
-                    if prevChild.LayoutOrder > 1 then
-                        local pCorner = prevChild:FindFirstChildOfClass("UICorner")
-                        if pCorner then pCorner:Destroy() end
-                    end
-                end
-                
-                if not el:FindFirstChildOfClass("UICorner") then
-                    corner(el, 16)
-                end
-            end
-
-            -- ✅ ИСПРАВЛЕНИЕ ФОТО 2 (Параграф)
-            function Section:CreateParagraph(parConfig)
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
-                reg(box, "BackgroundColor3", "card")
-                mk("UIPadding", { PaddingTop = UDim.new(0, 14), PaddingBottom = UDim.new(0, 14), PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18), Parent = box })
-                
-                local lbl = mk("TextLabel", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, Text = parConfig.Text, Font = Enum.Font.Gotham, TextSize = 13, TextColor3 = T.textDim, TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, Parent = box })
-                reg(lbl, "TextColor3", "textDim")
-                
-                addElement(box)
-                return box
+            local function addRowSeparator(row)
+                local sep = mk("Frame", {
+                    AnchorPoint = Vector2.new(0.5, 1),
+                    Position = UDim2.new(0.5, 0, 1, 0),
+                    Size = UDim2.new(1, -36, 0, 1),
+                    BackgroundColor3 = T.stroke,
+                    BackgroundTransparency = 0.7,
+                    BorderSizePixel = 0,
+                    ZIndex = 2,
+                    Parent = row,
+                })
+                reg(sep, "BackgroundColor3", "stroke")
             end
 
             function Section:CreateToggle(togConfig)
@@ -694,12 +670,11 @@ function Library:CreateWindow(config)
                 function ElementObj:Get() return self.Value end
 
                 row.MouseButton1Click:Connect(function()
-                    state = not state
-                    ElementObj:Set(state)
-                    if togConfig.Callback then task.spawn(togConfig.Callback, state) end
+                    ElementObj:Set(not ElementObj.Value)
+                    if togConfig.Callback then task.spawn(togConfig.Callback, ElementObj.Value) end
                 end)
 
-                addElement(row)
+                addRowSeparator(row)
                 return ElementObj
             end
 
@@ -759,13 +734,12 @@ function Library:CreateWindow(config)
                 UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then update(input) end end)
                 UserInputService.InputEnded:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then dragging = false end end)
 
-                addElement(box)
+                addRowSeparator(box)
                 return ElementObj
             end
 
-            -- ✅ ИСПРАВЛЕНИЕ ФОТО 1 (Выпадающий список)
             function Section:CreateDropdown(dropConfig)
-                local baseHeight = 72
+                local baseHeight = 76
                 local optHeight = 40
                 local listHeight = #dropConfig.Options * optHeight
 
@@ -777,11 +751,10 @@ function Library:CreateWindow(config)
                 local name = mk("TextLabel", { Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = dropConfig.Title, Font = Enum.Font.GothamMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
                 reg(name, "TextColor3", "text")
                 
-                local dropBtn = mk("TextButton", { Position = UDim2.fromOffset(18, 38), Size = UDim2.new(1, -36, 0, 34), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = box })
+                local dropBtn = mk("TextButton", { Position = UDim2.fromOffset(18, 36), Size = UDim2.new(1, -36, 0, 34), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = box })
                 corner(dropBtn, 12)
                 reg(dropBtn, "BackgroundColor3", "toggleOff")
                 stroke(dropBtn, T.stroke, 1, 0.6)
-                hoverEffect(dropBtn, "cardHover", "toggleOff")
 
                 local dropLbl = mk("TextLabel", { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0), BackgroundTransparency = 1, Text = dropConfig.Multi and "Select..." or dropConfig.Options[1], Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = dropBtn })
                 reg(dropLbl, "TextColor3", "text")
@@ -789,6 +762,7 @@ function Library:CreateWindow(config)
                 local list = mk("Frame", { Position = UDim2.fromOffset(18, baseHeight), Size = UDim2.new(1, -36, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, ClipsDescendants = true, Parent = box })
                 corner(list, 12)
                 reg(list, "BackgroundColor3", "toggleOff")
+
                 mk("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
 
                 local selected = {}
@@ -818,12 +792,12 @@ function Library:CreateWindow(config)
                 end
 
                 for i, opt in ipairs(dropConfig.Options) do
-                    local optRow = mk("TextButton", { Size = UDim2.new(1, 0, 0, optHeight), BackgroundColor3 = T.activePill, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = i, Parent = list })
-                    optRow.MouseEnter:Connect(function() playHover(); TweenService:Create(optRow, Tw.fast, { BackgroundTransparency = 0 }):Play() end)
+                    local optRow = mk("TextButton", { Size = UDim2.new(1, 0, 0, optHeight), BackgroundColor3 = T.card, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = i, Parent = list })
+                    optRow.MouseEnter:Connect(function() playHover(); TweenService:Create(optRow, Tw.fast, { BackgroundColor3 = T.cardHover, BackgroundTransparency = 0 }):Play() end)
                     optRow.MouseLeave:Connect(function() TweenService:Create(optRow, Tw.fast, { BackgroundTransparency = 1 }):Play() end)
                     optRow.MouseButton1Down:Connect(function() playSound("click") end)
 
-                    local lbl = mk("TextLabel", { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -46, 1, 0), BackgroundTransparency = 1, Text = opt, Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = optRow })
+                    local lbl = mk("TextLabel", { Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -56, 1, 0), BackgroundTransparency = 1, Text = opt, Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = optRow })
                     reg(lbl, "TextColor3", "text")
                     local check = mk("TextLabel", { Name = "Check", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(18, 18), BackgroundTransparency = 1, Text = "✓", Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = T.accent, Visible = false, Parent = optRow })
                     reg(check, "TextColor3", "accent")
@@ -869,36 +843,7 @@ function Library:CreateWindow(config)
                     end
                 end)
 
-                addElement(box)
-                return ElementObj
-            end
-
-            function Section:CreateSearch(searchConfig)
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
-                reg(box, "BackgroundColor3", "card")
-                hoverEffect(box, "cardHover", "card")
-                box.MouseEnter:Connect(playHover)
-
-                local name = mk("TextLabel", { Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = searchConfig.Title or "Search", Font = Enum.Font.GothamMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
-                reg(name, "TextColor3", "text")
-                
-                local field = mk("Frame", { Position = UDim2.fromOffset(18, 36), Size = UDim2.new(1, -36, 0, 34), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Parent = box })
-                corner(field, 12)
-                reg(field, "BackgroundColor3", "toggleOff")
-                stroke(field, T.stroke, 1, 0.6)
-
-                local textBox = mk("TextBox", { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = searchConfig.Placeholder or "Search...", PlaceholderColor3 = T.textDim, TextColor3 = T.text, Font = Enum.Font.Gotham, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, Parent = field })
-                reg(textBox, "TextColor3", "text")
-                reg(textBox, "PlaceholderColor3", "textDim")
-
-                field.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then textBox:CaptureFocus(); playSound("click") end end)
-                textBox:GetPropertyChangedSignal("Text"):Connect(function() if searchConfig.Callback then task.spawn(searchConfig.Callback, textBox.Text) end end)
-
-                local ElementObj = {}
-                function ElementObj:Set(val) textBox.Text = tostring(val) end
-                function ElementObj:Get() return textBox.Text end
-
-                addElement(box)
+                addRowSeparator(box)
                 return ElementObj
             end
 
@@ -911,7 +856,7 @@ function Library:CreateWindow(config)
                 btn.MouseButton1Down:Connect(function() playSound("click") end)
                 btn.MouseButton1Click:Connect(function() if btnConfig.Callback then task.spawn(btnConfig.Callback) end end)
                 
-                addElement(btn)
+                addRowSeparator(btn)
                 return btn
             end
             
@@ -939,7 +884,7 @@ function Library:CreateWindow(config)
                 function ElementObj:Set(val) textBox.Text = tostring(val) end
                 function ElementObj:Get() return textBox.Text end
 
-                addElement(box)
+                addRowSeparator(box)
                 return ElementObj
             end
 
@@ -977,7 +922,7 @@ function Library:CreateWindow(config)
                     end
                 end)
 
-                addElement(box)
+                addRowSeparator(box)
                 return ElementObj
             end
             
@@ -990,13 +935,8 @@ function Library:CreateWindow(config)
                 
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 reg(box, "BackgroundColor3", "card")
-                
-                -- ✅ Фикс ховера (срабатывает на clickArea и panel)
-                local function applyHover() TweenService:Create(box, Tw.fast, { BackgroundColor3 = T.cardHover }):Play() end
-                local function removeHover() TweenService:Create(box, Tw.fast, { BackgroundColor3 = T.card }):Play() end
-                
-                box.MouseEnter:Connect(function() playHover(); applyHover() end)
-                box.MouseLeave:Connect(removeHover)
+                hoverEffect(box, "cardHover", "card")
+                box.MouseEnter:Connect(playHover)
 
                 local swatchBg = mk("Frame", { Position = UDim2.fromOffset(18, 18), Size = UDim2.fromOffset(44, 44), BackgroundColor3 = defColor, BackgroundTransparency = 0, Parent = box })
                 corner(swatchBg, 12)
@@ -1009,14 +949,10 @@ function Library:CreateWindow(config)
 
                 local clickArea = mk("TextButton", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundTransparency = 1, Text = "", Parent = box })
                 clickArea.MouseButton1Down:Connect(function() playSound("click") end)
-                clickArea.MouseEnter:Connect(applyHover)
-                clickArea.MouseLeave:Connect(removeHover)
 
                 local panel = mk("Frame", { Position = UDim2.fromOffset(0, baseHeight), Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, ClipsDescendants = true, Parent = box })
                 corner(panel, 14)
                 reg(panel, "BackgroundColor3", "toggleOff")
-                panel.MouseEnter:Connect(applyHover)
-                panel.MouseLeave:Connect(removeHover)
                 
                 local ElementObj = { Value = defColor }
 
@@ -1079,7 +1015,7 @@ function Library:CreateWindow(config)
                     end
                 end)
 
-                addElement(box)
+                addRowSeparator(box)
                 return ElementObj
             end
 
