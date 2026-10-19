@@ -1,7 +1,8 @@
 --[[
     CRYOHUB UI LIBRARY
     Version: 1.0
-    Features: MD3 + Steam Style, Animations, Sounds, Grouping, Loading Screen, Island, Themes.
+    Author: CryoHub
+    Description: A sleek, animated, MD3/Steam inspired UI library.
 ]]
 
 local Library = {}
@@ -14,9 +15,9 @@ local player = Players.LocalPlayer
 local pg = player:WaitForChild("PlayerGui")
 
 -- ============================================================
---  CONFIG & THEMES
+--  THEMES
 -- ============================================================
-local Themes = {
+local THEMES = {
     SteamDark = {
         bg = Color3.fromRGB(23, 26, 33), sidebar = Color3.fromRGB(27, 30, 38),
         content = Color3.fromRGB(32, 35, 44), card = Color3.fromRGB(42, 46, 56),
@@ -61,17 +62,15 @@ local Themes = {
     },
 }
 
-local T = Themes.SteamDark
-local CurrentTheme = "SteamDark"
-local Regs = {} -- Реестр для смены тем
+local T = THEMES.SteamDark
+local Regs = {}
 local function reg(el, prop, key)
     table.insert(Regs, { el = el, prop = prop, key = key })
 end
 
 local function applyTheme(name)
-    if not Themes[name] then return end
-    CurrentTheme = name
-    T = Themes[name]
+    if not THEMES[name] then return end
+    T = THEMES[name]
     for _, r in ipairs(Regs) do
         if r.el and r.el.Parent then
             TweenService:Create(r.el, TweenInfo.new(0.28), { [r.prop] = T[r.key] }):Play()
@@ -174,7 +173,7 @@ local function playSliderTick()
 end
 
 -- ============================================================
---  CORE GUI & NOTIFICATIONS
+--  GUI & NOTIFICATIONS
 -- ============================================================
 for _, n in ipairs({"CryoHubUI"}) do
     local o = pg:FindFirstChild(n); if o then o:Destroy() end
@@ -229,21 +228,21 @@ function Library:Notify(title, desc, iconId)
 end
 
 -- ============================================================
---  WINDOW CREATION
+--  CREATE WINDOW
 -- ============================================================
 function Library:CreateWindow(config)
     config = config or {}
     local Title = config.Title or "CryoHub"
-    local Theme = config.Theme or "SteamDark"
     local FloatIcon = config.FloatIcon or ICONS.Default
-    local LoadingConfig = config.Loading or { Stages = {} }
+    local LoadingStages = config.LoadingStages or {}
+    
+    applyTheme(config.Theme or "SteamDark")
 
-    applyTheme(Theme)
-
-    local Window = { Title = Title, Pages = {}, Tabs = {}, ActiveTab = nil }
+    local Window = { Pages = {}, Tabs = {}, ActiveTab = nil }
     local ROOT_W, ROOT_H = 700, 500
     local TITLE_H, SIDEBAR_W = 56, 190
 
+    -- Root
     local root = mk("CanvasGroup", {
         Name = "Root", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
         Size = UDim2.fromOffset(ROOT_W, ROOT_H), BackgroundColor3 = T.bg, BackgroundTransparency = 0,
@@ -255,6 +254,7 @@ function Library:CreateWindow(config)
 
     local uiScale = mk("UIScale", { Scale = getAdaptiveScale(), Parent = root })
 
+    -- TitleBar
     local titleBar = mk("Frame", { Name = "TitleBar", Size = UDim2.new(1, 0, 0, TITLE_H), BackgroundTransparency = 1, Active = true, ZIndex = 2, Parent = root })
     local titleLbl = mk("TextLabel", { Position = UDim2.fromOffset(26, 0), Size = UDim2.new(1, -200, 1, 0), BackgroundTransparency = 1, Font = Enum.Font.GothamBold, Text = Title, TextSize = 17, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = titleBar })
     reg(titleLbl, "TextColor3", "text")
@@ -271,6 +271,7 @@ function Library:CreateWindow(config)
     local btnMin = windowGlyph("−", "textDim", "text", -62)
     local btnClose = windowGlyph("×", "textDim", "redBright", -20)
 
+    -- Sidebar
     local sidebar = mk("Frame", { Name = "Sidebar", Position = UDim2.fromOffset(0, TITLE_H), Size = UDim2.new(0, SIDEBAR_W, 1, -TITLE_H), BackgroundColor3 = T.sidebar, BackgroundTransparency = 0, BorderSizePixel = 0, ZIndex = 2, Parent = root })
     reg(sidebar, "BackgroundColor3", "sidebar")
 
@@ -290,6 +291,7 @@ function Library:CreateWindow(config)
     end)
     sidebarScroll.ScrollBarImageTransparency = 0.9
 
+    -- Content
     local content = mk("Frame", { Name = "Content", Position = UDim2.fromOffset(SIDEBAR_W, TITLE_H), Size = UDim2.new(1, -SIDEBAR_W, 1, -TITLE_H), BackgroundColor3 = T.content, BackgroundTransparency = 0, ClipsDescendants = true, BorderSizePixel = 0, ZIndex = 2, Parent = root })
     reg(content, "BackgroundColor3", "content")
 
@@ -319,13 +321,8 @@ function Library:CreateWindow(config)
         clampRootPosition()
     end)
 
-    -- ============================================================
-    --  FLOATING ISLAND
-    -- ============================================================
-    local floatBtn = mk("TextButton", {
-        Name = "FloatToggle", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14),
-        Size = UDim2.fromOffset(108, 44), BackgroundColor3 = T.card, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, Visible = false, ZIndex = 10, Parent = gui,
-    })
+    -- Float Button
+    local floatBtn = mk("TextButton", { Name = "FloatToggle", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.fromOffset(108, 44), BackgroundColor3 = T.card, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, Visible = false, ZIndex = 10, Parent = gui })
     corner(floatBtn, 22)
     local fStroke = stroke(floatBtn, T.accent, 1.5, 1)
     reg(fStroke, "Color", "accent")
@@ -387,9 +384,7 @@ function Library:CreateWindow(config)
         if not gpe and input.KeyCode == Enum.KeyCode.K then toggleUI() end
     end)
 
-    -- ============================================================
-    --  MINIMIZE & CLOSE
-    -- ============================================================
+    -- Minimize & Close
     local minimized = false
     btnMin.MouseButton1Click:Connect(function()
         if toggling or hidden then return end
@@ -447,9 +442,7 @@ function Library:CreateWindow(config)
         destroyUI()
     end)
 
-    -- ============================================================
-    --  DRAG
-    -- ============================================================
+    -- Drag
     local dragging, dragStart, startPos = false, nil, nil
     titleBar.InputBegan:Connect(function(input)
         if not loaded then return end
@@ -471,9 +464,7 @@ function Library:CreateWindow(config)
         end
     end)
 
-    -- ============================================================
-    --  LOADING SCREEN
-    -- ============================================================
+    -- Loading Screen
     local LOADING_W, LOADING_H = 460, 260
     local loadingScreen = mk("CanvasGroup", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(LOADING_W, LOADING_H), BackgroundColor3 = T.card, BackgroundTransparency = 0, GroupTransparency = 1, ZIndex = 200, ClipsDescendants = true, Parent = gui })
     corner(loadingScreen, 22); stroke(loadingScreen, T.stroke, 1.2, 0.55)
@@ -628,16 +619,27 @@ function Library:CreateWindow(config)
             table.insert(self.Elements, group)
 
             local rowCount = 0
-            local function addRowSeparator(row)
-                local sep = mk("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = row })
-                reg(sep, "BackgroundColor3", "stroke")
+            local function getIsLast() return false end -- Handled dynamically
+
+            -- Helper to add separators automatically
+            local function addElement(el)
+                rowCount += 1
+                el.LayoutOrder = rowCount
+                table.insert(self.Elements, el)
+                
+                -- Add separator to previous element
+                local children = group:GetChildren()
+                for _, child in ipairs(children) do
+                    if child:IsA("GuiObject") and child ~= el and child:FindFirstChild("RowSep") == nil then
+                        local sep = mk("Frame", { Name = "RowSep", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = child })
+                        reg(sep, "BackgroundColor3", "stroke")
+                    end
+                end
             end
-            local function getIsLast() return false end -- Dynamic check handled by appending
 
             -- Toggle
             function Section:CreateToggle(togConfig)
-                local row = mk("TextButton", { Size = UDim2.new(1, 0, 0, togConfig.Description and 62 or 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, LayoutOrder = rowCount + 1, Parent = group })
-                rowCount += 1
+                local row = mk("TextButton", { Size = UDim2.new(1, 0, 0, togConfig.Description and 62 or 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = group })
                 reg(row, "BackgroundColor3", "card")
                 hoverEffect(row, T.cardHover, T.card)
                 row.MouseEnter:Connect(playHover)
@@ -685,25 +687,13 @@ function Library:CreateWindow(config)
                     if togConfig.Callback then task.spawn(togConfig.Callback, state) end
                 end)
 
-                row.MouseEnter:Connect(function() rowCount = rowCount end) -- No-op
-                table.insert(self.Elements, row) -- Track for layout
-                -- Re-eval separators
-                for i, v in ipairs(group:GetChildren()) do
-                    if v:IsA("TextButton") then
-                        local sep = v:FindFirstChild("RowSep")
-                        if not sep then
-                            local s = mk("Frame", { Name = "RowSep", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = v })
-                            reg(s, "BackgroundColor3", "stroke")
-                        end
-                    end
-                end
+                addElement(row)
                 return ElementObj
             end
 
             -- Slider
             function Section:CreateSlider(sliderConfig)
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = rowCount + 1, Parent = group })
-                rowCount += 1
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, T.cardHover, T.card)
                 box.MouseEnter:Connect(playHover)
@@ -758,10 +748,7 @@ function Library:CreateWindow(config)
                 UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then update(input) end end)
                 UserInputService.InputEnded:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then dragging = false end end)
 
-                table.insert(self.Elements, box)
-                -- Add separator
-                local sep = mk("Frame", { Name = "RowSep", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = box })
-                reg(sep, "BackgroundColor3", "stroke")
+                addElement(box)
                 return ElementObj
             end
 
@@ -769,8 +756,7 @@ function Library:CreateWindow(config)
             function Section:CreateDropdown(dropConfig)
                 local baseHeight, optHeight = 76, 40
                 local listHeight = #dropConfig.Options * optHeight
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = rowCount + 1, Parent = group })
-                rowCount += 1
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, T.cardHover, T.card)
                 box.MouseEnter:Connect(playHover)
@@ -869,32 +855,26 @@ function Library:CreateWindow(config)
                     end
                 end)
 
-                table.insert(self.Elements, box)
-                local sep = mk("Frame", { Name = "RowSep", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = box })
-                reg(sep, "BackgroundColor3", "stroke")
+                addElement(box)
                 return ElementObj
             end
 
             -- Button
             function Section:CreateButton(btnConfig)
-                local btn = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = btnConfig.Title, Font = Enum.Font.GothamBold, TextSize = 15, TextColor3 = btnConfig.Danger and T.red or T.text, AutoButtonColor = false, LayoutOrder = rowCount + 1, Parent = group })
-                rowCount += 1
+                local btn = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = btnConfig.Title, Font = Enum.Font.GothamBold, TextSize = 15, TextColor3 = btnConfig.Danger and T.red or T.text, AutoButtonColor = false, Parent = group })
                 reg(btn, "BackgroundColor3", "card")
                 hoverEffect(btn, T.cardHover, T.card)
                 btn.MouseEnter:Connect(playHover)
                 btn.MouseButton1Down:Connect(function() playSound("click") end)
                 btn.MouseButton1Click:Connect(function() if btnConfig.Callback then task.spawn(btnConfig.Callback) end end)
                 
-                table.insert(self.Elements, btn)
-                local sep = mk("Frame", { Name = "RowSep", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = btn })
-                reg(sep, "BackgroundColor3", "stroke")
+                addElement(btn)
                 return btn
             end
             
             -- Input
             function Section:CreateInput(inpConfig)
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = rowCount + 1, Parent = group })
-                rowCount += 1
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, T.cardHover, T.card)
                 box.MouseEnter:Connect(playHover)
@@ -917,16 +897,13 @@ function Library:CreateWindow(config)
                 function ElementObj:Set(val) textBox.Text = tostring(val) end
                 function ElementObj:Get() return textBox.Text end
 
-                table.insert(self.Elements, box)
-                local sep = mk("Frame", { Name = "RowSep", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = box })
-                reg(sep, "BackgroundColor3", "stroke")
+                addElement(box)
                 return ElementObj
             end
 
             -- Keybind
             function Section:CreateKeybind(keyConfig)
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = rowCount + 1, Parent = group })
-                rowCount += 1
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, T.cardHover, T.card)
                 box.MouseEnter:Connect(playHover)
@@ -959,9 +936,7 @@ function Library:CreateWindow(config)
                     end
                 end)
 
-                table.insert(self.Elements, box)
-                local sep = mk("Frame", { Name = "RowSep", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = box })
-                reg(sep, "BackgroundColor3", "stroke")
+                addElement(box)
                 return ElementObj
             end
             
@@ -973,8 +948,7 @@ function Library:CreateWindow(config)
                 local defColor = colConfig.Default or Color3.fromRGB(255, 255, 255)
                 local currentR, currentG, currentB = defColor.R * 255, defColor.G * 255, defColor.B * 255
                 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = rowCount + 1, Parent = group })
-                rowCount += 1
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, T.cardHover, T.card)
                 box.MouseEnter:Connect(playHover)
@@ -1056,9 +1030,7 @@ function Library:CreateWindow(config)
                     end
                 end)
 
-                table.insert(self.Elements, box)
-                local sep = mk("Frame", { Name = "RowSep", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0), Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = box })
-                reg(sep, "BackgroundColor3", "stroke")
+                addElement(box)
                 return ElementObj
             end
 
@@ -1072,10 +1044,9 @@ function Library:CreateWindow(config)
     --  START WINDOW
     -- ============================================================
     local function runLoading()
-        local stages = LoadingConfig.Stages or {}
-        local totalStages = #stages
+        local totalStages = #LoadingStages
         if totalStages == 0 then return end
-        for i, stage in ipairs(stages) do
+        for i, stage in ipairs(LoadingStages) do
             loadingSubtitle.Text = stage.text
             local targetPct = (i / totalStages) * 100
             TweenService:Create(progressFill, TweenInfo.new(0.3, Enum.EasingStyle.Quart), { Size = UDim2.fromScale(targetPct / 100, 1) }):Play()
