@@ -1,9 +1,12 @@
 --[[
     CRYOHUB UI LIBRARY
-    Version: 2.1 (Exact Monolith Port + All Fixes)
+    Version: 2.2 (Flags, Dependencies, Tooltips, Advanced Notifications)
 ]]
 
 local Library = {}
+Library.Flags = {}
+Library.Dependencies = {}
+
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -85,6 +88,33 @@ local function getAdaptiveScale()
 end
 
 -- ============================================================
+--  DEPENDENCY SYSTEM
+-- ============================================================
+local function processDependencies()
+    for _, dep in ipairs(Library.Dependencies) do
+        local parentFlag = Library.Flags[dep.flag]
+        if parentFlag and dep.element then
+            local isVisible = false
+            if type(parentFlag.Value) == "boolean" then
+                isVisible = (parentFlag.Value == dep.value)
+            elseif type(parentFlag.Value) == "string" then
+                isVisible = (parentFlag.Value == dep.value)
+            elseif type(parentFlag.Value) == "number" then
+                isVisible = (parentFlag.Value >= dep.value)
+            end
+            
+            if dep.element.Visible ~= isVisible then
+                dep.element.Visible = isVisible
+                if isVisible then
+                    dep.element.Size = UDim2.new(1, 0, 0, 0)
+                    TweenService:Create(dep.element, Tw.fast, { Size = dep.originalSize }):Play()
+                end
+            end
+        end
+    end
+end
+
+-- ============================================================
 --  SOUNDS
 -- ============================================================
 local Sounds = {}
@@ -137,6 +167,27 @@ local gui = mk("ScreenGui", {
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999, Parent = pg,
 })
 
+-- Tooltip
+local tooltip = mk("TextLabel", {
+    Name = "Tooltip", Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X,
+    BackgroundColor3 = T.bg, BackgroundTransparency = 0.1, Visible = false, ZIndex = 100,
+    Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Center,
+    Parent = gui,
+})
+corner(tooltip, 6)
+stroke(tooltip, T.stroke, 1, 0.5)
+mk("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8), Parent = tooltip })
+
+local function addTooltip(element, text)
+    if not text or UserInputService.TouchEnabled then return end
+    element.MouseEnter:Connect(function()
+        tooltip.Text = text
+        tooltip.Position = UDim2.new(0, element.AbsolutePosition.X + 10, 0, element.AbsolutePosition.Y - 30)
+        tooltip.Visible = true
+    end)
+    element.MouseLeave:Connect(function() tooltip.Visible = false end)
+end
+
 local notifWrap = mk("Frame", {
     AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -20, 1, -20),
     Size = UDim2.fromOffset(340, 0), BackgroundTransparency = 1, ZIndex = 5, Parent = gui,
@@ -147,12 +198,14 @@ mk("UIListLayout", {
 })
 
 local notifOrder = 0
-function Library:Notify(title, desc, iconId)
+function Library:Notify(title, desc, iconId, duration, actionText, actionCallback)
     notifOrder += 1
     iconId = iconId or ICONS.Check
+    duration = duration or 4
     playSound("notify")
-    local slot = mk("Frame", { Size = UDim2.fromOffset(340, 76), BackgroundTransparency = 1, LayoutOrder = notifOrder, Parent = notifWrap })
-    local card = mk("Frame", { Size = UDim2.fromScale(1, 1), Position = UDim2.new(1, 360, 0, 0), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = slot })
+    
+    local slot = mk("Frame", { Size = UDim2.fromOffset(340, 84), BackgroundTransparency = 1, LayoutOrder = notifOrder, Parent = notifWrap })
+    local card = mk("Frame", { Size = UDim2.fromScale(1, 1), Position = UDim2.new(1, 360, 0, 0), BackgroundColor3 = T.card, BackgroundTransparency = 0, ClipsDescendants = true, Parent = slot })
     corner(card, 16)
     stroke(card, T.stroke, 1.2, 0.35)
 
@@ -160,13 +213,34 @@ function Library:Notify(title, desc, iconId)
     corner(iconBox, 14)
     mk("ImageLabel", { Size = UDim2.fromOffset(24, 24), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundTransparency = 1, Image = iconId, ImageColor3 = T.accent, Parent = iconBox })
     
-    mk("TextLabel", { Position = UDim2.fromOffset(76, 14), Size = UDim2.new(1, -110, 0, 20), BackgroundTransparency = 1, Text = title, Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = card })
-    mk("TextLabel", { Position = UDim2.fromOffset(76, 36), Size = UDim2.new(1, -90, 0, 30), BackgroundTransparency = 1, Text = desc, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = T.textDim, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, Parent = card })
+    local titleLbl = mk("TextLabel", { Position = UDim2.fromOffset(76, 14), Size = UDim2.new(1, -110, 0, 20), BackgroundTransparency = 1, Text = title, Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = card })
+    local descLbl = mk("TextLabel", { Position = UDim2.fromOffset(76, 34), Size = UDim2.new(1, -110, 0, 28), BackgroundTransparency = 1, Text = desc, Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = T.textDim, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, Parent = card })
     
     local closeBtn = mk("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 10), Size = UDim2.fromOffset(22, 22), BackgroundTransparency = 1, Text = "×", Font = Enum.Font.GothamBold, TextSize = 18, TextColor3 = T.textDim, AutoButtonColor = false, Parent = card })
     closeBtn.MouseEnter:Connect(function() playHover(); TweenService:Create(closeBtn, Tw.fast, { TextColor3 = T.text }):Play() end)
     closeBtn.MouseLeave:Connect(function() TweenService:Create(closeBtn, Tw.fast, { TextColor3 = T.textDim }):Play() end)
     closeBtn.MouseButton1Down:Connect(function() playSound("click") end)
+
+    -- Action Button
+    if actionText and actionCallback then
+        local actBtn = mk("TextButton", { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -10, 1, -10), Size = UDim2.fromOffset(60, 20), BackgroundColor3 = T.accent, BackgroundTransparency = 0.8, Text = actionText, Font = Enum.Font.GothamBold, TextSize = 11, TextColor3 = T.accent, AutoButtonColor = false, Parent = card })
+        corner(actBtn, 6)
+        actBtn.MouseEnter:Connect(function() TweenService:Create(actBtn, Tw.fast, { BackgroundTransparency = 0.5 }):Play() end)
+        actBtn.MouseLeave:Connect(function() TweenService:Create(actBtn, Tw.fast, { BackgroundTransparency = 0.8 }):Play() end)
+        actBtn.MouseButton1Click:Connect(function()
+            playSound("click")
+            actionCallback()
+            -- Dismiss on action
+            local out = TweenService:Create(card, Tw.med, { Position = UDim2.new(1, 360, 0, 0) })
+            out:Play()
+            out.Completed:Connect(function() slot:Destroy() end)
+        end)
+    end
+
+    -- Progress Bar
+    local progressBg = mk("Frame", { AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 0, 1, 0), Size = UDim2.new(1, 0, 0, 4), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.5, Parent = card })
+    local progressFill = mk("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = T.accent, BackgroundTransparency = 0, Parent = progressBg })
+    TweenService:Create(progressFill, TweenInfo.new(duration, Enum.EasingStyle.Linear), { Size = UDim2.new(0, 0, 1, 0) }):Play()
 
     local dismissed = false
     local function dismiss()
@@ -178,7 +252,7 @@ function Library:Notify(title, desc, iconId)
     end
     closeBtn.MouseButton1Click:Connect(dismiss)
     TweenService:Create(card, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0, 0, 0, 0) }):Play()
-    task.delay(4, dismiss)
+    task.delay(duration, dismiss)
 end
 
 -- ============================================================
@@ -321,12 +395,12 @@ function Library:CreateWindow(config)
     end
 
     floatBtn.MouseButton1Click:Connect(function()
-        toggleUI(true) -- Sound plays ONLY on click
+        toggleUI(true)
     end)
 
     UserInputService.InputBegan:Connect(function(input, gpe)
         if not gpe and input.KeyCode == Enum.KeyCode.K then
-            toggleUI(false) -- NO sound on hotkey
+            toggleUI(false)
         end
     end)
 
@@ -417,7 +491,6 @@ function Library:CreateWindow(config)
         loadingScale.Scale = math.max(math.min(workspace.CurrentCamera.ViewportSize.X / 820, 1), 0.55) * 0.85
     end)
 
-    -- Drag Logic for Loading Screen
     local loadingDrag, loadingDragStart, loadingDragPos = false, nil, nil
     loadingScreen.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -434,7 +507,6 @@ function Library:CreateWindow(config)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then loadingDrag = false end
     end)
 
-    -- Decor (Dots only)
     local decorHolder = mk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 200, Parent = loadingScreen })
     for col = 0, math.floor(LOADING_W / 24) + 1 do
         for row = 0, math.floor(LOADING_H / 24) + 1 do
@@ -562,6 +634,7 @@ function Library:CreateWindow(config)
                 hoverEffect(row, "cardHover", "card")
                 row.MouseEnter:Connect(playHover)
                 row.MouseButton1Down:Connect(function() playSound("click") end)
+                if togConfig.Tooltip then addTooltip(row, togConfig.Tooltip) end
 
                 local name = mk("TextLabel", { Position = UDim2.fromOffset(18, 0), Size = UDim2.new(1, -110, 0, togConfig.Description and 22 or 52), BackgroundTransparency = 1, Text = togConfig.Title, Font = Enum.Font.GothamMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = togConfig.Description and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center, Parent = row })
                 if togConfig.Description then name.Position = UDim2.fromOffset(18, 10) end
@@ -592,6 +665,7 @@ function Library:CreateWindow(config)
                         TweenService:Create(track, Tw.fast, { BackgroundColor3 = T.toggleOff }):Play()
                         TweenService:Create(knob, Tw.fast, { BackgroundColor3 = T.toggleKnobOff, Position = UDim2.fromOffset(3, 0) + UDim2.fromScale(0, 0.5) }):Play()
                     end
+                    processDependencies()
                 end
                 function ElementObj:Get() return self.Value end
 
@@ -599,6 +673,11 @@ function Library:CreateWindow(config)
                     ElementObj:Set(not ElementObj.Value)
                     if togConfig.Callback then task.spawn(togConfig.Callback, ElementObj.Value) end
                 end)
+
+                if togConfig.Flag then Library.Flags[togConfig.Flag] = ElementObj end
+                if togConfig.DependsOn then
+                    table.insert(Library.Dependencies, { flag = togConfig.DependsOn[1], value = togConfig.DependsOn[2], element = row, originalSize = row.Size })
+                end
 
                 addRowSeparator(row)
                 return ElementObj
@@ -608,6 +687,7 @@ function Library:CreateWindow(config)
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
+                if sliderConfig.Tooltip then addTooltip(box, sliderConfig.Tooltip) end
 
                 local name = mk("TextLabel", { Position = UDim2.fromOffset(18, 14), Size = UDim2.new(1, -110, 0, 20), BackgroundTransparency = 1, Text = sliderConfig.Title, Font = Enum.Font.GothamMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
                 local valLbl = mk("TextLabel", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -18, 0, 14), Size = UDim2.fromOffset(70, 20), BackgroundTransparency = 1, Text = tostring(sliderConfig.Default or sliderConfig.Min or 0), Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Right, Parent = box })
@@ -638,6 +718,7 @@ function Library:CreateWindow(config)
                     fill.Size = UDim2.fromScale(p, 1)
                     knob.Position = UDim2.fromScale(p, 0.5)
                     valLbl.Text = tostring(math.floor(val))
+                    processDependencies()
                 end
                 function ElementObj:Get() return self.Value end
 
@@ -653,6 +734,11 @@ function Library:CreateWindow(config)
                 UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then update(input) end end)
                 UserInputService.InputEnded:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then dragging = false end end)
 
+                if sliderConfig.Flag then Library.Flags[sliderConfig.Flag] = ElementObj end
+                if sliderConfig.DependsOn then
+                    table.insert(Library.Dependencies, { flag = sliderConfig.DependsOn[1], value = sliderConfig.DependsOn[2], element = box, originalSize = box.Size })
+                end
+
                 addRowSeparator(box)
                 return ElementObj
             end
@@ -665,6 +751,7 @@ function Library:CreateWindow(config)
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
+                if dropConfig.Tooltip then addTooltip(box, dropConfig.Tooltip) end
 
                 local name = mk("TextLabel", { Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = dropConfig.Title, Font = Enum.Font.GothamMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
                 
@@ -702,11 +789,11 @@ function Library:CreateWindow(config)
                         updateSelectionVisual()
                         dropLbl.Text = val
                     end
+                    processDependencies()
                 end
 
                 for i, opt in ipairs(dropConfig.Options) do
                     local optRow = mk("TextButton", { Size = UDim2.new(1, 0, 0, optHeight), BackgroundColor3 = T.cardHover, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = i, Parent = list })
-                    -- ✅ New hover look for lists
                     optRow.MouseEnter:Connect(function() playHover(); TweenService:Create(optRow, Tw.fast, { BackgroundTransparency = 0 }):Play() end)
                     optRow.MouseLeave:Connect(function() TweenService:Create(optRow, Tw.fast, { BackgroundTransparency = 1 }):Play() end)
                     optRow.MouseButton1Down:Connect(function() playSound("click") end)
@@ -739,6 +826,7 @@ function Library:CreateWindow(config)
                             TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
                             isOpen = false
                         end
+                        processDependencies()
                     end)
                 end
 
@@ -755,6 +843,11 @@ function Library:CreateWindow(config)
                     end
                 end)
 
+                if dropConfig.Flag then Library.Flags[dropConfig.Flag] = ElementObj end
+                if dropConfig.DependsOn then
+                    table.insert(Library.Dependencies, { flag = dropConfig.DependsOn[1], value = dropConfig.DependsOn[2], element = box, originalSize = box.Size })
+                end
+
                 addRowSeparator(box)
                 return ElementObj
             end
@@ -765,7 +858,12 @@ function Library:CreateWindow(config)
                 btn.MouseEnter:Connect(playHover)
                 btn.MouseButton1Down:Connect(function() playSound("click") end)
                 btn.MouseButton1Click:Connect(function() if btnConfig.Callback then task.spawn(btnConfig.Callback) end end)
+                if btnConfig.Tooltip then addTooltip(btn, btnConfig.Tooltip) end
                 
+                if btnConfig.DependsOn then
+                    table.insert(Library.Dependencies, { flag = btnConfig.DependsOn[1], value = btnConfig.DependsOn[2], element = btn, originalSize = btn.Size })
+                end
+
                 addRowSeparator(btn)
                 return btn
             end
@@ -774,6 +872,7 @@ function Library:CreateWindow(config)
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
+                if inpConfig.Tooltip then addTooltip(box, inpConfig.Tooltip) end
 
                 mk("TextLabel", { Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = inpConfig.Title, Font = Enum.Font.GothamMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
                 local field = mk("Frame", { Position = UDim2.fromOffset(18, 36), Size = UDim2.new(1, -36, 0, 34), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Parent = box })
@@ -789,6 +888,11 @@ function Library:CreateWindow(config)
                 function ElementObj:Set(val) textBox.Text = tostring(val) end
                 function ElementObj:Get() return textBox.Text end
 
+                if inpConfig.Flag then Library.Flags[inpConfig.Flag] = ElementObj end
+                if inpConfig.DependsOn then
+                    table.insert(Library.Dependencies, { flag = inpConfig.DependsOn[1], value = inpConfig.DependsOn[2], element = box, originalSize = box.Size })
+                end
+
                 addRowSeparator(box)
                 return ElementObj
             end
@@ -797,6 +901,7 @@ function Library:CreateWindow(config)
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
+                if keyConfig.Tooltip then addTooltip(box, keyConfig.Tooltip) end
 
                 mk("TextLabel", { Position = UDim2.fromOffset(18, 0), Size = UDim2.new(1, -150, 1, 0), BackgroundTransparency = 1, Text = keyConfig.Title, Font = Enum.Font.GothamMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
                 
@@ -823,6 +928,11 @@ function Library:CreateWindow(config)
                     end
                 end)
 
+                if keyConfig.Flag then Library.Flags[keyConfig.Flag] = ElementObj end
+                if keyConfig.DependsOn then
+                    table.insert(Library.Dependencies, { flag = keyConfig.DependsOn[1], value = keyConfig.DependsOn[2], element = box, originalSize = box.Size })
+                end
+
                 addRowSeparator(box)
                 return ElementObj
             end
@@ -837,6 +947,7 @@ function Library:CreateWindow(config)
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, Parent = group })
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
+                if colConfig.Tooltip then addTooltip(box, colConfig.Tooltip) end
 
                 local swatchBg = mk("Frame", { Position = UDim2.fromOffset(18, 18), Size = UDim2.fromOffset(44, 44), BackgroundColor3 = defColor, BackgroundTransparency = 0, Parent = box })
                 corner(swatchBg, 12)
@@ -864,6 +975,7 @@ function Library:CreateWindow(config)
                 function ElementObj:Set(c)
                     currentR, currentG, currentB = c.R * 255, c.G * 255, c.B * 255
                     updateColor()
+                    processDependencies()
                 end
                 
                 local function createChannel(yPos, label, chColor, getVal, setVal)
@@ -911,6 +1023,11 @@ function Library:CreateWindow(config)
                         TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
                     end
                 end)
+
+                if colConfig.Flag then Library.Flags[colConfig.Flag] = ElementObj end
+                if colConfig.DependsOn then
+                    table.insert(Library.Dependencies, { flag = colConfig.DependsOn[1], value = colConfig.DependsOn[2], element = box, originalSize = box.Size })
+                end
 
                 addRowSeparator(box)
                 return ElementObj
@@ -973,6 +1090,7 @@ function Library:CreateWindow(config)
         
         task.delay(0.4, function()
             clampRootPosition()
+            processDependencies()
         end)
     end)
 
