@@ -1,0 +1,89 @@
+-- Загрузка библиотеки
+local CryoHub = loadstring(game:HttpGet("URL_ВАШЕГО_СКРИПТА_БИБЛИОТЕКИ"))()
+
+-- Создание окна и настройка загрузчика
+local Window = CryoHub:CreateWindow({
+    Title = "My Awesome Hub",
+    Theme = "SteamDark", -- "SteamDark", "SteamMidnight", "SteamLight"
+    Loading = {
+        Stages = {
+            { text = "Initializing...", duration = 0.5 },
+            { text = "Bypassing Anti-Cheat...", callback = function()
+                task.wait(1.5) -- Имитация работы
+                print("Anti-Cheat bypassed!")
+            end },
+            { text = "Loading UI...", duration = 0.5 }
+        }
+    }
+})
+
+-- Вкладка "Main"
+local MainTab = Window:CreateTab({ Title = "Main", Icon = "rbxassetid://10709752035" })
+
+-- Секция "Combat"
+local CombatSection = MainTab:CreateSection("Combat")
+
+CombatSection:CreateToggle({
+    Title = "Enable Aimbot",
+    Description = "Locks onto nearest enemy",
+    Default = false,
+    Callback = function(state)
+        print("Aimbot:", state)
+    end
+})
+
+CombatSection:CreateSlider({
+    Title = "FOV Radius",
+    Min = 10,
+    Max = 500,
+    Default = 150,
+    Callback = function(value)
+        print("FOV Radius:", value)
+    end
+})
+
+-- Секция "Visuals"
+local VisualsSection = MainTab:CreateSection("Visuals")
+
+VisualsSection:CreateDropdown({
+    Title = "ESP Mode",
+    Options = {"Box", "Chams", "Skeleton"},
+    Default = "Box",
+    Multi = false,
+    Callback = function(selected)
+        print("ESP Mode:", selected)
+    end
+})
+
+VisualsSection:CreateColorPicker({
+    Title = "ESP Color",
+    Default = Color3.fromRGB(255, 80, 80),
+    Callback = function(color)
+        -- Изменение цвета в реальном времени
+        -- print("ESP Color updated:", color)
+    end
+})
+
+-- Вкладка "Settings"
+local SettingsTab = Window:CreateTab({ Title = "Settings", Icon = "rbxassetid://10709810948" })
+local SystemSection = SettingsTab:CreateSection("System")
+
+SystemSection:CreateKeybind({
+    Title = "Hide UI",
+    Default = Enum.KeyCode.RightShift,
+    Callback = function(key)
+        print("New hide key:", key.Name)
+    end
+})
+
+SystemSection:CreateButton({
+    Title = "Unload Script",
+    Danger = true,
+    Callback = function()
+        -- Логика выгрузки
+        print("Unloading...")
+    end
+})
+
+-- Смена темы из скрипта
+-- Window:SetTheme("SteamMidnight")
