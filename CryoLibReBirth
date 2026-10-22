@@ -1,11 +1,11 @@
 -- ============================================================
---  CRYOHUB STEAM EDITION — LIBRARY v1.3.0 (Final)
+--  CRYOHUB STEAM EDITION — LIBRARY v1.4.0
 -- ============================================================
 
 local Library = {}
 Library.Flags = {}
 Library.Dependencies = {}
-Library.Version = "1.3.0-Steam"
+Library.Version = "1.4.0-Steam"
 
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
@@ -15,7 +15,7 @@ local player            = Players.LocalPlayer
 local pg                = player:WaitForChild("PlayerGui")
 
 -- ============================================================
---  FONTS (OPPO Sans with fallback)
+--  FONTS
 -- ============================================================
 local function tryFont(weight, fallback)
     local ok, f = pcall(function() return Font.fromName("OPPO Sans", weight, Enum.FontStyle.Normal) end)
@@ -197,8 +197,10 @@ local function processDependencies()
             if type(parentFlag.Value) == "boolean" then isVisible = (parentFlag.Value == dep.value)
             elseif type(parentFlag.Value) == "string" then isVisible = (parentFlag.Value == dep.value)
             elseif type(parentFlag.Value) == "number" then isVisible = (parentFlag.Value >= dep.value) end
+            
             if dep.element.Visible ~= isVisible then
                 dep.element.Visible = isVisible
+                -- Если элемент скрыт, мы сжимаем его размер. Трекер сам пересчитает скругления.
                 if isVisible then
                     dep.element.Size = UDim2.new(1, 0, 0, 0)
                     TweenService:Create(dep.element, Tw.fast, { Size = dep.originalSize }):Play()
@@ -209,7 +211,7 @@ local function processDependencies()
 end
 
 -- ============================================================
---  ROW EDGE ROUNDING & TRACKER (Merge logic)
+--  ROW EDGE ROUNDING & TRACKER (Merge Logic)
 -- ============================================================
 local function addMasks(row, radius, side)
     local mSize = UDim2.fromOffset(radius, radius)
@@ -231,19 +233,15 @@ local function addMasks(row, radius, side)
         table.insert(masks, makeMask(Vector2.new(1, 0), 1, 0))
     end
     row:GetPropertyChangedSignal("BackgroundColor3"):Connect(function()
-        for _, m in ipairs(masks) do
-            if m.Parent then m.BackgroundColor3 = row.BackgroundColor3 end
-        end
+        for _, m in ipairs(masks) do if m.Parent then m.BackgroundColor3 = row.BackgroundColor3 end end
     end)
     row:GetPropertyChangedSignal("BackgroundTransparency"):Connect(function()
-        for _, m in ipairs(masks) do
-            if m.Parent then m.BackgroundTransparency = row.BackgroundTransparency end
-        end
+        for _, m in ipairs(masks) do if m.Parent then m.BackgroundTransparency = row.BackgroundTransparency end end
     end)
 end
 
 local function addRowSeparator(row)
-    -- ✅ Исправлена длина и позиция полосы (идеально по центру)
+    -- ✅ Длина -32 идеально совпадает с закруглением 16px по бокам
     local sep = mk("Frame", {
         Name = "__separator",
         AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0),
@@ -254,10 +252,9 @@ local function addRowSeparator(row)
 end
 
 local function applyRowStyle(row, isFirst, isLast)
+    -- Сначала очищаем старые модификации
     local c = row:FindFirstChildOfClass("UICorner"); if c then c:Destroy() end
-    for _, m in ipairs(row:GetChildren()) do
-        if m.Name == "__cornerMask" then m:Destroy() end
-    end
+    for _, m in ipairs(row:GetChildren()) do if m.Name == "__cornerMask" then m:Destroy() end end
     local sep = row:FindFirstChild("__separator"); if sep then sep:Destroy() end
 
     local radius = 16
@@ -273,48 +270,67 @@ local function applyRowStyle(row, isFirst, isLast)
     if not isLast then addRowSeparator(row) end
 end
 
-local function attachRowTracker(group, sectionName)
-    local rows = {}
+local function attachRowTracker(group)
     local function refresh()
-        for i = #rows, 1, -1 do
-            if not rows[i].Parent then table.remove(rows, i) end
+        local children = {}
+        for _, child in ipairs(group:GetChildren()) do
+            if child:GetAttribute("IsRow") then table.insert(children, child) end
         end
-        
-        if #rows == 1 then
-            -- Авто-конвертация в одиночную карточку
-            group.BackgroundTransparency = 1
-            local grpStroke = group:FindFirstChildOfClass("UIStroke")
-            if grpStroke then grpStroke.Transparency = 1 end
-            applyRowStyle(rows[1], true, true)
-        elseif #rows >= 2 then
-            group.BackgroundTransparency = 0
-            local grpStroke = group:FindFirstChildOfClass("UIStroke")
-            if grpStroke then grpStroke.Transparency = 0.55 end
-            for i, row in ipairs(rows) do
-                applyRowStyle(row, i == 1, i == #rows)
+        -- Сортируем по порядку
+        table.sort(children, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
+
+        -- Берем ТОЛЬКО видимые элементы
+        local visibleRows = {}
+        for _, child in ipairs(children) do
+            if child.Visible then table.insert(visibleRows, child) end
+        end
+
+        -- Очищаем все ряды
+        for _, child in ipairs(children) do
+            local c = child:FindFirstChildOfClass("UICorner"); if c then c:Destroy() end
+            for _, m in ipairs(child:GetChildren()) do if m.Name == "__cornerMask" then m:Destroy() end end
+            local sep = child:FindFirstChild("__separator"); if sep then sep:Destroy() end
+        end
+
+        -- Применяем стили
+        local i = 1
+        while i <= #visibleRows do
+            local row = visibleRows[i]
+            local isMerge = row:GetAttribute("Merge") == true
+            
+            if isMerge then
+                local j = i
+                while j < #visibleRows and visibleRows[j+1]:GetAttribute("Merge") == true do
+                    j = j + 1
+                end
+                -- Группируем элементы от i до j
+                for k = i, j do
+                    local r = visibleRows[k]
+                    if k == i and k == j then applyRowStyle(r, true, true)
+                    elseif k == i then applyRowStyle(r, true, false)
+                    elseif k == j then applyRowStyle(r, false, true)
+                    else applyRowStyle(r, false, false) end
+                end
+                i = j + 1
+            else
+                applyRowStyle(row, true, true)
+                i = i + 1
             end
         end
     end
     
     local function tryTrack(child)
-        -- ✅ Трекаем ТОЛЬКО если указан Merge = true
-        if child:GetAttribute("Merge") == true then
-            table.insert(rows, child)
-            task.defer(refresh)
-        else
-            -- Если элемент одиночный (Merge = false), мы просто обновляем группу, чтобы закрыть предыдущие
+        if child:GetAttribute("IsRow") == true then
+            child:GetPropertyChangedSignal("Visible"):Connect(function()
+                task.defer(refresh)
+            end)
             task.defer(refresh)
         end
     end
     
     for _, child in ipairs(group:GetChildren()) do tryTrack(child) end
     group.ChildAdded:Connect(tryTrack)
-    group.ChildRemoved:Connect(function(child)
-        for i, r in ipairs(rows) do
-            if r == child then table.remove(rows, i); break end
-        end
-        task.defer(refresh)
-    end)
+    group.ChildRemoved:Connect(function() task.defer(refresh) end)
 end
 
 -- ============================================================
@@ -404,6 +420,7 @@ function Library:CreateWindow(config)
     local TITLE_H, SIDEBAR_W = 56, 190
     local baseScale = getAdaptiveScale()
 
+    -- Root: Frame (ClipsDescendants = true for rounded corners)
     local root = mk("Frame", {
         Name = "Root", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.55),
         Size = UDim2.fromOffset(ROOT_W, ROOT_H), BackgroundColor3 = T.bg,
@@ -430,7 +447,9 @@ function Library:CreateWindow(config)
     local btnMin   = windowGlyph("−", "textDim", "text",      -62)
     local btnClose = windowGlyph("×", "textDim", "redBright", -20)
 
+    -- ✅ Добавлен UICorner, чтобы скруглить нижний левый угол и не вылезать за root
     local sidebar = mk("Frame", { Name = "Sidebar", Position = UDim2.fromOffset(0, TITLE_H), Size = UDim2.new(0, SIDEBAR_W, 1, -TITLE_H), BackgroundColor3 = T.sidebar, BackgroundTransparency = 0, BorderSizePixel = 0, ZIndex = 2, Parent = root })
+    corner(sidebar, 16)
     reg(sidebar, "BackgroundColor3", "sidebar")
 
     local sidebarScroll = mk("ScrollingFrame", {
@@ -450,7 +469,9 @@ function Library:CreateWindow(config)
     end)
     sidebarScroll.ScrollBarImageTransparency = 0.9
 
+    -- ✅ Добавлен UICorner для content
     local content = mk("Frame", { Name = "Content", Position = UDim2.fromOffset(SIDEBAR_W, TITLE_H), Size = UDim2.new(1, -SIDEBAR_W, 1, -TITLE_H), BackgroundColor3 = T.content, BackgroundTransparency = 0, ClipsDescendants = true, BorderSizePixel = 0, ZIndex = 2, Parent = root })
+    corner(content, 16)
     reg(content, "BackgroundColor3", "content")
 
     local Window = { Pages = {}, Tabs = {}, ActiveTab = nil, _sidebarItems = {}, _sidebar = sidebar, _content = content }
@@ -541,7 +562,7 @@ function Library:CreateWindow(config)
             corner(group, 16); local gs = stroke(group, T.stroke, 1.2, 0.55)
             reg(group, "BackgroundColor3", "card"); reg(gs, "Color", "stroke")
             mk("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder, Parent = group })
-            attachRowTracker(group, name)
+            attachRowTracker(group)
 
             local Section = { Group = group, _nextOrder = 0, _scroll = scroll }
             local function nextOrder() Section._nextOrder += 1; return Section._nextOrder end
@@ -565,8 +586,8 @@ function Library:CreateWindow(config)
                 local callback = cfg.Callback
 
                 local row = mk("TextButton", { Size = UDim2.new(1, 0, 0, desc and 62 or 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, LayoutOrder = nextOrder(), Parent = group })
-                row:SetAttribute("Merge", isMerge) -- ✅ Установка флага слияния
-                if not isMerge then corner(row, 16) end -- Если одиночный, сразу скругляем
+                row:SetAttribute("IsRow", true)
+                row:SetAttribute("Merge", isMerge)
 
                 reg(row, "BackgroundColor3", "card")
                 hoverEffect(row, "cardHover", "card")
@@ -626,8 +647,8 @@ function Library:CreateWindow(config)
                 local callback = cfg.Callback
 
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                box:SetAttribute("IsRow", true)
                 box:SetAttribute("Merge", isMerge)
-                if not isMerge then corner(box, 16) end
 
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
@@ -687,8 +708,8 @@ function Library:CreateWindow(config)
                 local callback = cfg.Callback
 
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                box:SetAttribute("IsRow", true)
                 box:SetAttribute("Merge", isMerge)
-                if not isMerge then corner(box, 16) end
 
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
@@ -719,7 +740,7 @@ function Library:CreateWindow(config)
                 return ElementObj
             end
 
-            -- ============= DROPDOWN =============
+            -- ============= DROPDOWN (ИСПРАВЛЕНА СТРУКТУРА) =============
             local openDropdowns = {}
             function Section:CreateDropdown(cfg)
                 cfg = cfg or {}
@@ -729,36 +750,41 @@ function Library:CreateWindow(config)
                 local multi = cfg.Multi or false
                 local callback = cfg.Callback
                 local default = cfg.Default
-                local baseHeight = 76
-                local optHeight = 40
-                local listHeight = #options * optHeight
+                local listHeight = #options * 40
 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
+                -- Основной контейнер использует AutomaticSize для корректного расширения
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
+                box:SetAttribute("IsRow", true)
                 box:SetAttribute("Merge", isMerge)
-                if not isMerge then corner(box, 16) end
 
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
+                
+                mk("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = box })
+                mk("UIPadding", { PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18), PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), Parent = box })
 
-                local name = mk("TextLabel", { Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = title, FontFace = FontMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
-                reg(name, "TextColor3", "text")
-                local dropBtn = mk("TextButton", { Position = UDim2.fromOffset(18, 36), Size = UDim2.new(1, -36, 0, 34), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = box })
+                -- Верхняя часть (Заголовок и Кнопка)
+                local header = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, LayoutOrder = 1, Parent = box })
+                mk("TextLabel", { Position = UDim2.fromOffset(0, 0), Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = title, FontFace = FontMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = header })
+                reg(header:FindFirstChildOfClass("TextLabel"), "TextColor3", "text")
+
+                local dropBtn = mk("TextButton", { Position = UDim2.fromOffset(0, 26), Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = header })
                 corner(dropBtn, 12); reg(dropBtn, "BackgroundColor3", "toggleOff")
                 local dbs = stroke(dropBtn, T.stroke, 1, 0.6); reg(dbs, "Color", "stroke")
 
                 local dropLbl = mk("TextLabel", { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0), BackgroundTransparency = 1, Text = multi and "Select..." or (default or options[1] or ""), FontFace = FontRegular, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = dropBtn })
                 reg(dropLbl, "TextColor3", "text")
 
-                -- ✅ ClipsDescendants для списка, чтобы при закрытии ничего не вылезало
-                local list = mk("Frame", { Position = UDim2.fromOffset(18, baseHeight), Size = UDim2.new(1, -36, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, ClipsDescendants = true, Parent = box })
+                -- Нижняя часть (Список опций)
+                local list = mk("Frame", { Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = T.toggleOff, ClipsDescendants = true, LayoutOrder = 2, Parent = box })
                 corner(list, 12); reg(list, "BackgroundColor3", "toggleOff")
                 mk("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
 
                 local selected = {}
                 local optionRows = {}
-
                 local ElementObj = { Value = multi and {} or (default or options[1]) }
+
                 local function updateSelectionVisual()
                     for opt, row in pairs(optionRows) do
                         local check = row:FindFirstChild("Check")
@@ -769,8 +795,9 @@ function Library:CreateWindow(config)
                 end
 
                 for i, opt in ipairs(options) do
-                    local optRow = mk("TextButton", { Size = UDim2.new(1, 0, 0, optHeight), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = i, Parent = list })
-                    if i == 1 or i == #options then corner(optRow, 12) end -- ✅ Скругление крайних опций
+                    local optRow = mk("TextButton", { Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = i, Parent = list })
+                    if i == 1 or i == #options then corner(optRow, 12) end
+                    
                     optRow.MouseEnter:Connect(function() playHover()
                         if not selected[opt] then TweenService:Create(optRow, Tw.fast, { BackgroundColor3 = T.cardHover, BackgroundTransparency = 0 }):Play() end
                     end)
@@ -819,16 +846,15 @@ function Library:CreateWindow(config)
                 local isOpen = false
                 local function closeDrop()
                     if not isOpen then return end; isOpen = false
-                    TweenService:Create(list, Tw.fast, { Size = UDim2.new(1, -36, 0, 0) }):Play()
-                    TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
+                    TweenService:Create(list, Tw.fast, { Size = UDim2.new(1, 0, 0, 0) }):Play()
                     for i, dd in ipairs(openDropdowns) do if dd.box == box then table.remove(openDropdowns, i); break end end
                 end
+                
                 dropBtn.MouseButton1Click:Connect(function()
                     playSound("click")
                     if isOpen then closeDrop() else
                         isOpen = true
-                        TweenService:Create(list, Tw.med, { Size = UDim2.new(1, -36, 0, listHeight) }):Play()
-                        TweenService:Create(box, Tw.med, { Size = UDim2.new(1, 0, 0, baseHeight + listHeight) }):Play()
+                        TweenService:Create(list, Tw.med, { Size = UDim2.new(1, 0, 0, listHeight) }):Play()
                         table.insert(openDropdowns, { box = box, btn = dropBtn, list = list, close = closeDrop })
                     end
                 end)
@@ -864,8 +890,8 @@ function Library:CreateWindow(config)
                 local isDanger = cfg.Danger or false
 
                 local btn = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = label, FontFace = FontBold, TextSize = 15, TextColor3 = isDanger and T.red or T.text, AutoButtonColor = false, LayoutOrder = nextOrder(), Parent = group })
+                btn:SetAttribute("IsRow", true)
                 btn:SetAttribute("Merge", isMerge)
-                if not isMerge then corner(btn, 16) end
 
                 reg(btn, "BackgroundColor3", "card")
                 hoverEffect(btn, "cardHover", "card")
@@ -885,8 +911,8 @@ function Library:CreateWindow(config)
                 local callback = cfg.Callback
 
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                box:SetAttribute("IsRow", true)
                 box:SetAttribute("Merge", isMerge)
-                if not isMerge then corner(box, 16) end
 
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
@@ -923,39 +949,44 @@ function Library:CreateWindow(config)
                 return ElementObj
             end
 
-            -- ============= COLOR PICKER =============
+            -- ============= COLOR PICKER (ИСПРАВЛЕНА СТРУКТУРА) =============
             function Section:CreateColorPicker(cfg)
                 cfg = cfg or {}
                 local isMerge = cfg.Merge or false
                 local title = cfg.Title or "Color"
                 local default = cfg.Default or Color3.fromRGB(255, 255, 255)
                 local callback = cfg.Callback
-                
-                local baseHeight, sliderRowHeight, padding = 80, 44, 14
-                local panelHeight = padding + sliderRowHeight * 3 + 20 
-                
+                local panelHeight = 172
                 local curR, curG, curB = default.R * 255, default.G * 255, default.B * 255
 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
+                -- Используем AutomaticSize для корректного расширения
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
+                box:SetAttribute("IsRow", true)
                 box:SetAttribute("Merge", isMerge)
-                if not isMerge then corner(box, 16) end
-
+                
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
 
-                local swatch = mk("Frame", { Position = UDim2.fromOffset(18, 18), Size = UDim2.fromOffset(44, 44), BackgroundColor3 = default, BackgroundTransparency = 0, Parent = box })
+                mk("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = box })
+                mk("UIPadding", { PaddingLeft = UDim.new(0, 18), PaddingRight = UDim.new(0, 18), PaddingTop = UDim.new(0, 18), PaddingBottom = UDim.new(0, 18), Parent = box })
+
+                -- Верхняя часть (Сватч и Текст)
+                local header = mk("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, LayoutOrder = 1, Parent = box })
+                local swatch = mk("Frame", { Size = UDim2.fromOffset(44, 44), BackgroundColor3 = default, BackgroundTransparency = 0, Parent = header })
                 corner(swatch, 12); stroke(swatch, T.stroke, 1, 0.4)
-                local name = mk("TextLabel", { Position = UDim2.fromOffset(76, 18), Size = UDim2.new(1, -140, 0, 22), BackgroundTransparency = 1, Text = title, FontFace = FontBold, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
+                
+                local name = mk("TextLabel", { Position = UDim2.fromOffset(58, 2), Size = UDim2.new(1, -58, 0, 22), BackgroundTransparency = 1, Text = title, FontFace = FontBold, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = header })
                 reg(name, "TextColor3", "text")
-                local hexLbl = mk("TextLabel", { Position = UDim2.fromOffset(76, 40), Size = UDim2.new(1, -140, 0, 18), BackgroundTransparency = 1, Text = string.format("RGB: %d, %d, %d", math.floor(curR), math.floor(curG), math.floor(curB)), FontFace = FontRegular, TextSize = 12, TextColor3 = T.textDim, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
+                local hexLbl = mk("TextLabel", { Position = UDim2.fromOffset(58, 24), Size = UDim2.new(1, -58, 0, 18), BackgroundTransparency = 1, Text = string.format("RGB: %d, %d, %d", math.floor(curR), math.floor(curG), math.floor(curB)), FontFace = FontRegular, TextSize = 12, TextColor3 = T.textDim, TextXAlignment = Enum.TextXAlignment.Left, Parent = header })
                 reg(hexLbl, "TextColor3", "textDim")
 
-                local clickArea = mk("TextButton", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundTransparency = 1, Text = "", Parent = box })
+                local clickArea = mk("TextButton", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, Text = "", Parent = header })
                 clickArea.MouseButton1Down:Connect(function() playSound("click") end)
 
-                local panel = mk("Frame", { Position = UDim2.fromOffset(0, baseHeight), Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, ClipsDescendants = true, Parent = box })
-                corner(panel, 16); reg(panel, "BackgroundColor3", "toggleOff")
+                -- Нижняя часть (Панель)
+                local panel = mk("Frame", { Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = T.toggleOff, ClipsDescendants = true, LayoutOrder = 2, Parent = box })
+                corner(panel, 12); reg(panel, "BackgroundColor3", "toggleOff")
 
                 local ElementObj = { Value = default }
                 local function updateColor()
@@ -971,7 +1002,7 @@ function Library:CreateWindow(config)
                 end
 
                 local function createChannel(yPos, label, chColor, getV, setV)
-                    local row = mk("Frame", { Position = UDim2.fromOffset(padding, yPos), Size = UDim2.new(1, -padding * 2, 0, sliderRowHeight), BackgroundTransparency = 1, Parent = panel })
+                    local row = mk("Frame", { Position = UDim2.fromOffset(12, yPos), Size = UDim2.new(1, -24, 0, 44), BackgroundTransparency = 1, Parent = panel })
                     mk("TextLabel", { Position = UDim2.fromOffset(0, 4), Size = UDim2.fromOffset(20, 16), BackgroundTransparency = 1, Text = label, FontFace = FontBold, TextSize = 13, TextColor3 = chColor, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
                     local valueLbl = mk("TextLabel", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 4), Size = UDim2.fromOffset(40, 16), BackgroundTransparency = 1, Text = tostring(math.floor(getV())), FontFace = FontBold, TextSize = 12, TextColor3 = chColor, TextXAlignment = Enum.TextXAlignment.Right, Parent = row })
                     local track = mk("Frame", { Position = UDim2.fromOffset(0, 30), Size = UDim2.new(1, 0, 0, 6), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.5, Parent = row })
@@ -990,21 +1021,19 @@ function Library:CreateWindow(config)
                     end
                     hit.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; upd(input) end end)
                     UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then upd(input) end end)
-                    UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end end)
+                    UserInputService.InputEnded:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then dragging = false end end)
                 end
-                createChannel(padding, "R", Color3.fromRGB(235, 100, 98), function() return curR end, function(v) curR = v end)
-                createChannel(padding + sliderRowHeight, "G", Color3.fromRGB(116, 199, 108), function() return curG end, function(v) curG = v end)
-                createChannel(padding + sliderRowHeight * 2, "B", Color3.fromRGB(102, 192, 244), function() return curB end, function(v) curB = v end)
+                createChannel(12, "R", Color3.fromRGB(235, 100, 98), function() return curR end, function(v) curR = v end)
+                createChannel(12 + 44, "G", Color3.fromRGB(116, 199, 108), function() return curG end, function(v) curG = v end)
+                createChannel(12 + 88, "B", Color3.fromRGB(102, 192, 244), function() return curB end, function(v) curB = v end)
 
                 local isOpen = false
                 clickArea.MouseButton1Click:Connect(function()
                     isOpen = not isOpen
                     if isOpen then
                         TweenService:Create(panel, Tw.med, { Size = UDim2.new(1, 0, 0, panelHeight) }):Play()
-                        TweenService:Create(box, Tw.med, { Size = UDim2.new(1, 0, 0, baseHeight + panelHeight) }):Play()
                     else
                         TweenService:Create(panel, Tw.fast, { Size = UDim2.new(1, 0, 0, 0) }):Play()
-                        TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
                     end
                 end)
 
