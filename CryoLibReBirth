@@ -1,11 +1,9 @@
 -- ============================================================
---  CRYOHUB STEAM EDITION — LIBRARY v1.4.2 (Clean UI)
+--  CRYOHUB STEAM EDITION — LIBRARY v1.4.3 (Clean Grouped UI)
 -- ============================================================
 
 local Library = {}
-Library.Flags = {}
-Library.Dependencies = {}
-Library.Version = "1.4.2-Steam"
+Library.Version = "1.4.3-Steam"
 
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
