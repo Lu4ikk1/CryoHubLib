@@ -1,11 +1,11 @@
 -- ============================================================
---  CRYOHUB STEAM EDITION — LIBRARY v1.4.0 (CUSTOM LOAD & MERGE)
+--  CRYOHUB STEAM EDITION — LIBRARY v1.5.0 (FIXED ROUNDING & NEW ANIMS)
 -- ============================================================
 
 local Library = {}
 Library.Flags = {}
 Library.Dependencies = {}
-Library.Version = "1.4.0-Steam"
+Library.Version = "1.5.0-Steam"
 
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
@@ -74,12 +74,15 @@ local THEMES = {
 local currentTheme = "SteamDark"
 local T = THEMES[currentTheme]
 
+-- ✅ ОБНОВЛЕННЫЕ АНИМАЦИИ (Более пружинистые и сочные)
 local Tw = {
     fast  = TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-    med   = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+    med   = TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
     slow  = TweenInfo.new(0.45, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-    pressDown = TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-    pressUp   = TweenInfo.new(0.32, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out),
+    pressDown = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+    pressUp   = TweenInfo.new(0.4, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), -- Пружинистый отскок
+    toggle    = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),    -- Эффект отскока для тумблеров
+    notifyIn  = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),    -- Выезд уведомлений
 }
 
 local ICONS = {
@@ -113,9 +116,10 @@ local function stroke(p, c, t, tr)
     })
 end
 
+-- ✅ ОБНОВЛЕННАЯ АНИМАЦИЯ НАЖАТИЯ (Более глубокая и с пружинистым возвратом)
 local function press(btn)
     local s = btn:FindFirstChildOfClass("UIScale") or mk("UIScale", { Scale = 1, Parent = btn })
-    btn.MouseButton1Down:Connect(function() TweenService:Create(s, Tw.pressDown, { Scale = 0.96 }):Play() end)
+    btn.MouseButton1Down:Connect(function() TweenService:Create(s, Tw.pressDown, { Scale = 0.92 }):Play() end)
     btn.MouseButton1Up:Connect(function() TweenService:Create(s, Tw.pressUp, { Scale = 1 }):Play() end)
     btn.MouseLeave:Connect(function() TweenService:Create(s, Tw.fast, { Scale = 1 }):Play() end)
 end
@@ -201,7 +205,7 @@ local function processDependencies()
                 dep.element.Visible = isVisible
                 if isVisible then
                     dep.element.Size = UDim2.new(1, 0, 0, 0)
-                    TweenService:Create(dep.element, Tw.fast, { Size = dep.originalSize }):Play()
+                    TweenService:Create(dep.element, Tw.med, { Size = dep.originalSize }):Play()
                 end
             end
         end
@@ -369,7 +373,8 @@ function Library:Notify(title, desc, iconId, duration)
     local closeBtn = mk("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 10), Size = UDim2.fromOffset(22, 22), BackgroundTransparency = 1, Text = "×", FontFace = FontBold, TextSize = 18, TextColor3 = T.textDim, AutoButtonColor = false, Parent = card })
     closeBtn.MouseButton1Click:Connect(function() slot:Destroy() end)
     
-    TweenService:Create(card, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0, 0, 0, 0) }):Play()
+    -- ✅ Новая анимация выезда уведомления (пружинистая)
+    TweenService:Create(card, Tw.notifyIn, { Position = UDim2.new(0, 0, 0, 0) }):Play()
     task.delay(duration, function() if slot.Parent then slot:Destroy() end end)
 end
 
@@ -418,8 +423,9 @@ function Library:CreateWindow(config)
     local btnMin   = windowGlyph("−", "textDim", "text",      -62)
     local btnClose = windowGlyph("×", "textDim", "redBright", -20)
 
+    -- ✅ УБРАН corner(sidebar, 16) - теперь root обрезает нижние углы идеально
     local sidebar = mk("Frame", { Name = "Sidebar", Position = UDim2.fromOffset(0, TITLE_H), Size = UDim2.new(0, SIDEBAR_W, 1, -TITLE_H), BackgroundColor3 = T.sidebar, BackgroundTransparency = 0, BorderSizePixel = 0, ZIndex = 2, Parent = root })
-    corner(sidebar, 16); reg(sidebar, "BackgroundColor3", "sidebar")
+    reg(sidebar, "BackgroundColor3", "sidebar")
 
     local sidebarScroll = mk("ScrollingFrame", {
         Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, BorderSizePixel = 0,
@@ -430,8 +436,9 @@ function Library:CreateWindow(config)
     mk("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12), Parent = sidebarScroll })
     mk("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder, Parent = sidebarScroll })
 
+    -- ✅ УБРАН corner(content, 16) - теперь root обрезает нижние углы идеально
     local content = mk("Frame", { Name = "Content", Position = UDim2.fromOffset(SIDEBAR_W, TITLE_H), Size = UDim2.new(1, -SIDEBAR_W, 1, -TITLE_H), BackgroundColor3 = T.content, BackgroundTransparency = 0, ClipsDescendants = true, BorderSizePixel = 0, ZIndex = 2, Parent = root })
-    corner(content, 16); reg(content, "BackgroundColor3", "content")
+    reg(content, "BackgroundColor3", "content")
 
     local Window = { Pages = {}, Tabs = {}, ActiveTab = nil, _sidebarItems = {}, _sidebar = sidebar, _content = content }
 
@@ -452,7 +459,8 @@ function Library:CreateWindow(config)
         refreshSidebarColors()
         for pid, page in pairs(Window.Pages) do
             if pid == id then
-                page.Visible = true; page.Position = UDim2.fromOffset(8, 0)
+                page.Visible = true
+                page.Position = UDim2.fromOffset(8, 0)
                 TweenService:Create(page, Tw.med, { Position = UDim2.fromOffset(0, 0) }):Play()
             else
                 page.Visible = false
@@ -544,11 +552,12 @@ function Library:CreateWindow(config)
                 function ElementObj:Set(v)
                     self.Value = v
                     if v then
-                        TweenService:Create(track, Tw.fast, { BackgroundColor3 = T.accent }):Play()
-                        TweenService:Create(knob, Tw.fast, { BackgroundColor3 = T.toggleKnobOn, Position = UDim2.fromOffset(27, 0) + UDim2.fromScale(0, 0.5) }):Play()
+                        -- ✅ Новая пружинистая анимация тумблера
+                        TweenService:Create(track, Tw.toggle, { BackgroundColor3 = T.accent }):Play()
+                        TweenService:Create(knob, Tw.toggle, { BackgroundColor3 = T.toggleKnobOn, Position = UDim2.fromOffset(27, 0) + UDim2.fromScale(0, 0.5) }):Play()
                     else
-                        TweenService:Create(track, Tw.fast, { BackgroundColor3 = T.toggleOff }):Play()
-                        TweenService:Create(knob, Tw.fast, { BackgroundColor3 = T.toggleKnobOff, Position = UDim2.fromOffset(3, 0) + UDim2.fromScale(0, 0.5) }):Play()
+                        TweenService:Create(track, Tw.toggle, { BackgroundColor3 = T.toggleOff }):Play()
+                        TweenService:Create(knob, Tw.toggle, { BackgroundColor3 = T.toggleKnobOff, Position = UDim2.fromOffset(3, 0) + UDim2.fromScale(0, 0.5) }):Play()
                     end
                 end
 
@@ -570,6 +579,7 @@ function Library:CreateWindow(config)
                 btn:SetAttribute("IsRow", true)
                 btn:SetAttribute("Merge", isMerge)
                 reg(btn, "BackgroundColor3", "card"); hoverEffect(btn, "cardHover", "card")
+                press(btn) -- ✅ Добавил анимацию нажатия для кнопок
                 btn.MouseButton1Click:Connect(function() if cfg.Callback then task.spawn(cfg.Callback) end end)
                 return btn
             end
@@ -610,7 +620,6 @@ function Library:CreateWindow(config)
             TweenService:Create(progressFill, TweenInfo.new(0.3, Enum.EasingStyle.Quart), { Size = UDim2.fromScale(targetPct / 100, 1) }):Play()
             percentLbl.Text = math.floor(targetPct) .. "%"
 
-            -- ✅ ВЫПОЛНЕНИЕ ПОЛЬЗОВАТЕЛЬСКОГО КОДА ИЛИ ОЖИДАНИЕ
             if stage.callback then
                 local success, err = pcall(stage.callback)
                 if not success then warn("Loading error in stage '" .. stage.text .. "': " .. tostring(err)) end
@@ -625,9 +634,10 @@ function Library:CreateWindow(config)
         loadingScreen:Destroy()
 
         root.Visible = true
-        uiScale.Scale = 0.88
+        uiScale.Scale = 0.85
+        -- ✅ Новая пружинистая анимация появления окна
         TweenService:Create(root, Tw.med, { Position = UDim2.fromScale(0.5, 0.5) }):Play()
-        TweenService:Create(uiScale, Tw.med, { Scale = getAdaptiveScale() }):Play()
+        TweenService:Create(uiScale, Tw.pressUp, { Scale = getAdaptiveScale() }):Play()
         
         task.delay(0.4, function() Library:Notify(Title .. " Ready", "Interface loaded successfully.", ICONS.Check) end)
     end)
