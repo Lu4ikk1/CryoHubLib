@@ -1,16 +1,15 @@
 -- ============================================================
---  CRYOHUB STEAM EDITION — LIBRARY v1.4.4 (FULL COMPONENTS & CORNER FIX)
+--  CRYOHUB STEAM EDITION — LIBRARY v1.4.5 (STROKE & CORNER FIX)
 -- ============================================================
 
 local Library = {}
 Library.Flags = {}
 Library.Dependencies = {}
-Library.Version = "1.4.4-Steam"
+Library.Version = "1.4.5-Steam"
 
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
 local UserInputService  = game:GetService("UserInputService")
-local SoundService      = game:GetService("SoundService")
 local player            = Players.LocalPlayer
 local pg                = player:WaitForChild("PlayerGui")
 
@@ -19,9 +18,9 @@ local function tryFont(weight, fallback)
     if ok and f then return f end
     return Font.fromEnum(fallback)
 end
-local FontRegular = tryFont(Enum.FontWeight.Regular, Enum.Font.Gotham)
 local FontBold    = tryFont(Enum.FontWeight.Bold,    Enum.Font.GothamBold)
 local FontMedium  = tryFont(Enum.FontWeight.Medium,  Enum.Font.GothamMedium)
+local FontRegular = tryFont(Enum.FontWeight.Regular, Enum.Font.Gotham)
 
 local THEMES = {
     SteamDark = {
@@ -30,9 +29,7 @@ local THEMES = {
         cardHover = Color3.fromRGB(52, 57, 70), activePill = Color3.fromRGB(60, 63, 77),
         stroke = Color3.fromRGB(61, 63, 71), text = Color3.fromRGB(224, 228, 235),
         textDim = Color3.fromRGB(150, 155, 165), accent = Color3.fromRGB(102, 192, 244),
-        accentBright = Color3.fromRGB(135, 210, 255), onAccent = Color3.fromRGB(23, 26, 33),
-        red = Color3.fromRGB(235, 100, 98), redBright = Color3.fromRGB(255, 130, 130),
-        success = Color3.fromRGB(116, 199, 108),
+        red = Color3.fromRGB(235, 100, 98),
         toggleOff = Color3.fromRGB(30, 34, 43),
         toggleKnobOff = Color3.fromRGB(150, 155, 165),
         toggleKnobOn = Color3.fromRGB(23, 26, 33),
@@ -43,19 +40,14 @@ local currentTheme = "SteamDark"
 local T = THEMES[currentTheme]
 
 local Tw = {
-    fast  = TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-    med   = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+    fast = TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
 }
 
 local ICONS = {
-    Toggle = "rbxassetid://10709752035", Slider = "rbxassetid://10709810948",
-    Input  = "rbxassetid://10709751939", Drop = "rbxassetid://10734941354",
-    Button = "rbxassetid://10709810814", Keybind = "rbxassetid://10709752035",
-    Color = "rbxassetid://10734941354", Check = "rbxassetid://10709752035",
-    Warning = "rbxassetid://10709752035", Default = "rbxassetid://10709752035",
+    Toggle = "rbxassetid://10709752035",
+    Default = "rbxassetid://10709752035",
 }
 Library.Icons = ICONS
-local CONFIG = { SoundEnabled = true }
 
 local function mk(class, props)
     local o = Instance.new(class)
@@ -167,29 +159,27 @@ function Library:CreateWindow(config)
         Visible = false, Parent = gui,
     })
     corner(root, 22)
-    
-    -- Внешняя рамка без швов
-    local strokeFrame = mk("Frame", {
-        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 10, Parent = root,
-    })
-    stroke(strokeFrame, T.stroke, 1.5, 0.3)
 
     local uiScale = mk("UIScale", { Scale = getAdaptiveScale(), Parent = root })
 
-    local titleBar = mk("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundTransparency = 1, Parent = root })
+    -- Блок заголовка (наверху, во всю ширину)
+    local titleBar = mk("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundTransparency = 1, ZIndex = 3, Parent = root })
     mk("TextLabel", { Position = UDim2.fromOffset(26, 0), Size = UDim2.new(1, -200, 1, 0), BackgroundTransparency = 1, Text = Title, FontFace = FontBold, TextSize = 17, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = titleBar })
 
-    -- Сайдбар с защитой углов от вылезания
-    local sidebar = mk("Frame", { Position = UDim2.fromOffset(0, 56), Size = UDim2.new(0, 190, 1, -56), BackgroundColor3 = T.sidebar, ClipsDescendants = true, Parent = root })
-    mk("Frame", { Position = UDim2.new(0, 0, 1, -10), Size = UDim2.new(1, 0, 0, 10), BackgroundColor3 = T.sidebar, BorderSizePixel = 0, Parent = sidebar }) -- Маска нижнего угла
-
+    -- Сайдбар (начинается строго ПОД шапкой, не заходя на неё)
+    local sidebar = mk("Frame", { Position = UDim2.fromOffset(0, 56), Size = UDim2.new(0, 190, 1, -56), BackgroundColor3 = T.sidebar, ZIndex = 2, Parent = root })
     local sidebarScroll = mk("ScrollingFrame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, CanvasSize = UDim2.new(0,0,0,0), AutomaticCanvasSize = Enum.AutomaticSize.Y, Parent = sidebar })
     mk("UIPadding", { PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), Parent = sidebarScroll })
     mk("UIListLayout", { Padding = UDim.new(0, 6), Parent = sidebarScroll })
 
-    -- Контентная зона с маской углов
-    local content = mk("Frame", { Position = UDim2.new(0, 190, 0, 56), Size = UDim2.new(1, -190, 1, -56), BackgroundColor3 = T.content, ClipsDescendants = true, Parent = root })
-    mk("Frame", { Position = UDim2.new(1, -10, 1, -10), Size = UDim2.new(0, 10, 0, 10), BackgroundColor3 = T.content, BorderSizePixel = 0, Parent = content }) -- Маска правого нижнего угла
+    -- Контентная зона (начинается строго справа от сайдбара и под шапкой)
+    local content = mk("Frame", { Position = UDim2.fromOffset(190, 56), Size = UDim2.new(1, -190, 1, -56), BackgroundColor3 = T.content, ClipsDescendants = true, ZIndex = 2, Parent = root })
+
+    -- Обводка поверх всего окна (чтобы она никогда не перекрывалась внутренними элементами)
+    local strokeFrame = mk("Frame", {
+        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 10, Parent = root,
+    })
+    stroke(strokeFrame, T.stroke, 1.5, 0.3)
 
     local Window = { Pages = {}, Tabs = {}, ActiveTab = nil, _sidebarItems = {} }
 
@@ -240,7 +230,6 @@ function Library:CreateWindow(config)
 
             local Section = { Group = group, _nextOrder = 0 }
 
-            -- 1. TOGGLE
             function Section:CreateToggle(cfg)
                 Section._nextOrder += 1
                 local row = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = "", LayoutOrder = Section._nextOrder, Parent = group })
@@ -263,7 +252,6 @@ function Library:CreateWindow(config)
                 return row
             end
 
-            -- 2. SLIDER
             function Section:CreateSlider(cfg)
                 Section._nextOrder += 1
                 local min, max, default = cfg.Min or 0, cfg.Max or 100, cfg.Default or 0
@@ -297,7 +285,6 @@ function Library:CreateWindow(config)
                 return box
             end
 
-            -- 3. INPUT
             function Section:CreateInput(cfg)
                 Section._nextOrder += 1
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = T.card, LayoutOrder = Section._nextOrder, Parent = group })
@@ -312,7 +299,6 @@ function Library:CreateWindow(config)
                 return box
             end
 
-            -- 4. BUTTON
             function Section:CreateButton(cfg)
                 Section._nextOrder += 1
                 local btn = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = cfg.Title, FontFace = FontBold, TextSize = 15, TextColor3 = cfg.Danger and T.red or T.text, LayoutOrder = Section._nextOrder, Parent = group })
@@ -322,7 +308,6 @@ function Library:CreateWindow(config)
                 return btn
             end
 
-            -- 5. KEYBIND
             function Section:CreateKeybind(cfg)
                 Section._nextOrder += 1
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card, LayoutOrder = Section._nextOrder, Parent = group })
