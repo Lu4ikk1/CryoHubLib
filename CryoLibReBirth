@@ -1,15 +1,16 @@
 -- ============================================================
---  CRYOHUB STEAM EDITION — LIBRARY v1.4.3 (FINAL LAYOUT FIX)
+--  CRYOHUB STEAM EDITION — LIBRARY v1.4.4 (FULL COMPONENTS & CORNER FIX)
 -- ============================================================
 
 local Library = {}
 Library.Flags = {}
 Library.Dependencies = {}
-Library.Version = "1.4.3-Steam"
+Library.Version = "1.4.4-Steam"
 
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
 local UserInputService  = game:GetService("UserInputService")
+local SoundService      = game:GetService("SoundService")
 local player            = Players.LocalPlayer
 local pg                = player:WaitForChild("PlayerGui")
 
@@ -18,6 +19,7 @@ local function tryFont(weight, fallback)
     if ok and f then return f end
     return Font.fromEnum(fallback)
 end
+local FontRegular = tryFont(Enum.FontWeight.Regular, Enum.Font.Gotham)
 local FontBold    = tryFont(Enum.FontWeight.Bold,    Enum.Font.GothamBold)
 local FontMedium  = tryFont(Enum.FontWeight.Medium,  Enum.Font.GothamMedium)
 
@@ -28,7 +30,9 @@ local THEMES = {
         cardHover = Color3.fromRGB(52, 57, 70), activePill = Color3.fromRGB(60, 63, 77),
         stroke = Color3.fromRGB(61, 63, 71), text = Color3.fromRGB(224, 228, 235),
         textDim = Color3.fromRGB(150, 155, 165), accent = Color3.fromRGB(102, 192, 244),
-        red = Color3.fromRGB(235, 100, 98),
+        accentBright = Color3.fromRGB(135, 210, 255), onAccent = Color3.fromRGB(23, 26, 33),
+        red = Color3.fromRGB(235, 100, 98), redBright = Color3.fromRGB(255, 130, 130),
+        success = Color3.fromRGB(116, 199, 108),
         toggleOff = Color3.fromRGB(30, 34, 43),
         toggleKnobOff = Color3.fromRGB(150, 155, 165),
         toggleKnobOn = Color3.fromRGB(23, 26, 33),
@@ -39,14 +43,19 @@ local currentTheme = "SteamDark"
 local T = THEMES[currentTheme]
 
 local Tw = {
-    fast = TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+    fast  = TweenInfo.new(0.16, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+    med   = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
 }
 
 local ICONS = {
-    Toggle = "rbxassetid://10709752035",
-    Default = "rbxassetid://10709752035",
+    Toggle = "rbxassetid://10709752035", Slider = "rbxassetid://10709810948",
+    Input  = "rbxassetid://10709751939", Drop = "rbxassetid://10734941354",
+    Button = "rbxassetid://10709810814", Keybind = "rbxassetid://10709752035",
+    Color = "rbxassetid://10734941354", Check = "rbxassetid://10709752035",
+    Warning = "rbxassetid://10709752035", Default = "rbxassetid://10709752035",
 }
 Library.Icons = ICONS
+local CONFIG = { SoundEnabled = true }
 
 local function mk(class, props)
     local o = Instance.new(class)
@@ -74,81 +83,57 @@ local function getAdaptiveScale()
     return math.max(s, 0.55)
 end
 
+-- Логика слияния рядов (Merge)
 local function addMasks(row, radius, side)
     local mSize = UDim2.fromOffset(radius, radius)
     local makeMask = function(anchor, posX, posY)
         return mk("Frame", {
             Name = "__cornerMask", AnchorPoint = anchor,
             Position = UDim2.new(posX, 0, posY, 0), Size = mSize,
-            BackgroundColor3 = row.BackgroundColor3,
-            BackgroundTransparency = row.BackgroundTransparency,
+            BackgroundColor3 = row.BackgroundColor3, BackgroundTransparency = row.BackgroundTransparency,
             BorderSizePixel = 0, ZIndex = (row.ZIndex or 1) + 5, Parent = row,
         })
     end
-    if side == "bottom" then
-        makeMask(Vector2.new(0, 1), 0, 1)
-        makeMask(Vector2.new(1, 1), 1, 1)
-    else
-        makeMask(Vector2.new(0, 0), 0, 0)
-        makeMask(Vector2.new(1, 0), 1, 0)
-    end
+    if side == "bottom" then makeMask(Vector2.new(0, 1), 0, 1); makeMask(Vector2.new(1, 1), 1, 1)
+    else makeMask(Vector2.new(0, 0), 0, 0); makeMask(Vector2.new(1, 0), 1, 0) end
 end
 
 local function addRowSeparator(row)
     mk("Frame", {
-        Name = "__separator",
-        AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0),
-        Size = UDim2.new(1, -32, 0, 1), BackgroundColor3 = T.stroke,
-        BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = row,
+        Name = "__separator", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0),
+        Size = UDim2.new(1, -32, 0, 1), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = row,
     })
 end
 
 local function applyRowStyle(row, isFirst, isLast)
     local c = row:FindFirstChildOfClass("UICorner"); if c then c:Destroy() end
     for _, m in ipairs(row:GetChildren()) do if m.Name == "__cornerMask" or m.Name == "__separator" then m:Destroy() end end
-
     local radius = 16
-    if isFirst and isLast then
-        corner(row, radius)
-    elseif isFirst then
-        corner(row, radius)
-        addMasks(row, radius, "bottom")
-    elseif isLast then
-        corner(row, radius)
-        addMasks(row, radius, "top")
-    end
+    if isFirst and isLast then corner(row, radius)
+    elseif isFirst then corner(row, radius); addMasks(row, radius, "bottom")
+    elseif isLast then corner(row, radius); addMasks(row, radius, "top") end
     if not isLast then addRowSeparator(row) end
 end
 
 local function attachRowTracker(group)
     local function refresh()
         local children = {}
-        for _, child in ipairs(group:GetChildren()) do
-            if child:GetAttribute("IsRow") then table.insert(children, child) end
-        end
+        for _, child in ipairs(group:GetChildren()) do if child:GetAttribute("IsRow") then table.insert(children, child) end end
         table.sort(children, function(a, b) return a.LayoutOrder < b.LayoutOrder end)
-
         local visibleRows = {}
-        for _, child in ipairs(children) do
-            if child.Visible then table.insert(visibleRows, child) end
-        end
-
+        for _, child in ipairs(children) do if child.Visible then table.insert(visibleRows, child) end end
         for _, child in ipairs(children) do
             local c = child:FindFirstChildOfClass("UICorner"); if c then c:Destroy() end
             local m1 = child:FindFirstChild("__cornerMask"); if m1 then m1:Destroy() end
             local m2 = child:FindFirstChild("__separator"); if m2 then m2:Destroy() end
         end
-
         local i = 1
         while i <= #visibleRows do
             local row = visibleRows[i]
             local isMerge = row:GetAttribute("Merge") == true
-            
             if isMerge then
                 local j = i
-                while j < #visibleRows and visibleRows[j+1]:GetAttribute("Merge") == true do
-                    j = j + 1
-                end
+                while j < #visibleRows and visibleRows[j+1]:GetAttribute("Merge") == true do j = j + 1 end
                 for k = i, j do
                     local r = visibleRows[k]
                     if k == i and k == j then applyRowStyle(r, true, true)
@@ -158,16 +143,13 @@ local function attachRowTracker(group)
                 end
                 i = j + 1
             else
-                applyRowStyle(r, true, true)
+                applyRowStyle(row, true, true)
                 i = i + 1
             end
         end
     end
-    
     for _, child in ipairs(group:GetChildren()) do
-        if child:GetAttribute("IsRow") == true then
-            child:GetPropertyChangedSignal("Visible"):Connect(function() task.defer(refresh) end)
-        end
+        if child:GetAttribute("IsRow") == true then child:GetPropertyChangedSignal("Visible"):Connect(function() task.defer(refresh) end) end
     end
     task.defer(refresh)
 end
@@ -175,6 +157,7 @@ end
 function Library:CreateWindow(config)
     config = config or {}
     local Title = config.Title or "CryoHub"
+    local LoadingStages = config.LoadingStages or { { text = "Ready.", duration = 0.2 } }
 
     local gui = mk("ScreenGui", { Name = "CryoHubUI", ResetOnSpawn = false, IgnoreGuiInset = true, Parent = pg })
     
@@ -185,29 +168,28 @@ function Library:CreateWindow(config)
     })
     corner(root, 22)
     
-    local strokeContainer = mk("Frame", {
-        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 10, Parent = gui,
-    })
-    local strokeScale = mk("UIScale", { Scale = getAdaptiveScale(), Parent = strokeContainer })
+    -- Внешняя рамка без швов
     local strokeFrame = mk("Frame", {
-        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-        Size = UDim2.fromOffset(700, 500), BackgroundTransparency = 1, Parent = strokeContainer,
+        Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 10, Parent = root,
     })
-    corner(strokeFrame, 22); stroke(strokeFrame, T.stroke, 1.5, 0.3)
+    stroke(strokeFrame, T.stroke, 1.5, 0.3)
 
     local uiScale = mk("UIScale", { Scale = getAdaptiveScale(), Parent = root })
 
     local titleBar = mk("Frame", { Size = UDim2.new(1, 0, 0, 56), BackgroundTransparency = 1, Parent = root })
     mk("TextLabel", { Position = UDim2.fromOffset(26, 0), Size = UDim2.new(1, -200, 1, 0), BackgroundTransparency = 1, Text = Title, FontFace = FontBold, TextSize = 17, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = titleBar })
 
-    -- Сайдбар с отступами внутри для красоты
-    local sidebar = mk("Frame", { Position = UDim2.fromOffset(0, 56), Size = UDim2.new(0, 190, 1, -56), BackgroundColor3 = T.sidebar, Parent = root })
+    -- Сайдбар с защитой углов от вылезания
+    local sidebar = mk("Frame", { Position = UDim2.fromOffset(0, 56), Size = UDim2.new(0, 190, 1, -56), BackgroundColor3 = T.sidebar, ClipsDescendants = true, Parent = root })
+    mk("Frame", { Position = UDim2.new(0, 0, 1, -10), Size = UDim2.new(1, 0, 0, 10), BackgroundColor3 = T.sidebar, BorderSizePixel = 0, Parent = sidebar }) -- Маска нижнего угла
+
     local sidebarScroll = mk("ScrollingFrame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, CanvasSize = UDim2.new(0,0,0,0), AutomaticCanvasSize = Enum.AutomaticSize.Y, Parent = sidebar })
     mk("UIPadding", { PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12), PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10), Parent = sidebarScroll })
     mk("UIListLayout", { Padding = UDim.new(0, 6), Parent = sidebarScroll })
 
-    -- Контентная зона
+    -- Контентная зона с маской углов
     local content = mk("Frame", { Position = UDim2.new(0, 190, 0, 56), Size = UDim2.new(1, -190, 1, -56), BackgroundColor3 = T.content, ClipsDescendants = true, Parent = root })
+    mk("Frame", { Position = UDim2.new(1, -10, 1, -10), Size = UDim2.new(0, 10, 0, 10), BackgroundColor3 = T.content, BorderSizePixel = 0, Parent = content }) -- Маска правого нижнего угла
 
     local Window = { Pages = {}, Tabs = {}, ActiveTab = nil, _sidebarItems = {} }
 
@@ -257,13 +239,13 @@ function Library:CreateWindow(config)
             attachRowTracker(group)
 
             local Section = { Group = group, _nextOrder = 0 }
+
+            -- 1. TOGGLE
             function Section:CreateToggle(cfg)
                 Section._nextOrder += 1
                 local row = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = "", LayoutOrder = Section._nextOrder, Parent = group })
-                row:SetAttribute("IsRow", true)
-                row:SetAttribute("Merge", cfg.Merge == true)
+                row:SetAttribute("IsRow", true); row:SetAttribute("Merge", cfg.Merge == true)
                 hoverEffect(row, "cardHover", "card")
-
                 mk("TextLabel", { Position = UDim2.fromOffset(18, 0), Size = UDim2.new(1, -110, 1, 0), BackgroundTransparency = 1, Text = cfg.Title, FontFace = FontMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = row })
                 
                 local track = mk("Frame", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -18, 0.5, 0), Size = UDim2.fromOffset(50, 26), BackgroundColor3 = T.toggleOff, Parent = row })
@@ -281,22 +263,130 @@ function Library:CreateWindow(config)
                 return row
             end
 
+            -- 2. SLIDER
+            function Section:CreateSlider(cfg)
+                Section._nextOrder += 1
+                local min, max, default = cfg.Min or 0, cfg.Max or 100, cfg.Default or 0
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, LayoutOrder = Section._nextOrder, Parent = group })
+                box:SetAttribute("IsRow", true); box:SetAttribute("Merge", cfg.Merge == true)
+                hoverEffect(box, "cardHover", "card")
+
+                mk("TextLabel", { Position = UDim2.fromOffset(18, 14), Size = UDim2.new(1, -110, 0, 20), BackgroundTransparency = 1, Text = cfg.Title, FontFace = FontMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
+                local valLbl = mk("TextLabel", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -18, 0, 14), Size = UDim2.fromOffset(70, 20), BackgroundTransparency = 1, Text = tostring(default), FontFace = FontBold, TextSize = 14, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Right, Parent = box })
+                
+                local trackBg = mk("Frame", { Position = UDim2.fromOffset(18, 52), Size = UDim2.new(1, -36, 0, 6), BackgroundColor3 = T.toggleOff, Parent = box })
+                corner(trackBg, 3)
+                local pct = (default - min) / (max - min)
+                local fill = mk("Frame", { Size = UDim2.fromScale(pct, 1), BackgroundColor3 = T.accent, Parent = trackBg })
+                corner(fill, 3)
+                local knob = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(pct, 0.5), Size = UDim2.fromOffset(22, 22), BackgroundColor3 = T.accent, Parent = trackBg })
+                corner(knob, 11)
+
+                local dragging = false
+                local hit = mk("TextButton", { Position = UDim2.fromOffset(0, 42), Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, Text = "", Parent = box })
+                local function update(input)
+                    local relX = math.clamp((input.Position.X - trackBg.AbsolutePosition.X) / trackBg.AbsoluteSize.X, 0, 1)
+                    local val = math.floor(min + (max - min) * relX)
+                    fill.Size = UDim2.fromScale(relX, 1); knob.Position = UDim2.fromScale(relX, 0.5)
+                    valLbl.Text = tostring(val)
+                    if cfg.Callback then cfg.Callback(val) end
+                end
+                hit.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true; update(input) end end)
+                UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then update(input) end end)
+                UserInputService.InputEnded:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then dragging = false end end)
+                return box
+            end
+
+            -- 3. INPUT
+            function Section:CreateInput(cfg)
+                Section._nextOrder += 1
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = T.card, LayoutOrder = Section._nextOrder, Parent = group })
+                box:SetAttribute("IsRow", true); box:SetAttribute("Merge", cfg.Merge == true)
+                hoverEffect(box, "cardHover", "card")
+
+                mk("TextLabel", { Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = cfg.Title, FontFace = FontMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
+                local field = mk("Frame", { Position = UDim2.fromOffset(18, 36), Size = UDim2.new(1, -36, 0, 34), BackgroundColor3 = T.toggleOff, Parent = box })
+                corner(field, 12); stroke(field, T.stroke, 1, 0.6)
+                local textBox = mk("TextBox", { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0), BackgroundTransparency = 1, Text = cfg.Default or "", PlaceholderText = cfg.Placeholder or "", PlaceholderColor3 = T.textDim, TextColor3 = T.text, FontFace = FontRegular, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, Parent = field })
+                textBox.FocusLost:Connect(function() if cfg.Callback then cfg.Callback(textBox.Text) end end)
+                return box
+            end
+
+            -- 4. BUTTON
             function Section:CreateButton(cfg)
                 Section._nextOrder += 1
                 local btn = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = cfg.Title, FontFace = FontBold, TextSize = 15, TextColor3 = cfg.Danger and T.red or T.text, LayoutOrder = Section._nextOrder, Parent = group })
-                btn:SetAttribute("IsRow", true)
-                btn:SetAttribute("Merge", cfg.Merge == true)
+                btn:SetAttribute("IsRow", true); btn:SetAttribute("Merge", cfg.Merge == true)
                 hoverEffect(btn, "cardHover", "card")
                 btn.MouseButton1Click:Connect(function() if cfg.Callback then cfg.Callback() end end)
                 return btn
             end
+
+            -- 5. KEYBIND
+            function Section:CreateKeybind(cfg)
+                Section._nextOrder += 1
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card, LayoutOrder = Section._nextOrder, Parent = group })
+                box:SetAttribute("IsRow", true); box:SetAttribute("Merge", cfg.Merge == true)
+                hoverEffect(box, "cardHover", "card")
+
+                mk("TextLabel", { Position = UDim2.fromOffset(18, 0), Size = UDim2.new(1, -150, 1, 0), BackgroundTransparency = 1, Text = cfg.Title, FontFace = FontMedium, TextSize = 15, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box })
+                local keyBtn = mk("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -18, 0.5, 0), Size = UDim2.fromOffset(100, 34), BackgroundColor3 = T.toggleOff, Text = cfg.Default and cfg.Default.Name or "None", FontFace = FontBold, TextSize = 13, TextColor3 = T.accent, Parent = box })
+                corner(keyBtn, 17)
+
+                local listening = false
+                keyBtn.MouseButton1Click:Connect(function()
+                    if listening then return end
+                    listening = true; keyBtn.Text = "Press..."; keyBtn.TextColor3 = T.textDim
+                end)
+                UserInputService.InputBegan:Connect(function(input, gpe)
+                    if gpe or not listening then return end
+                    if input.UserInputType == Enum.UserInputType.Keyboard then
+                        keyBtn.Text = input.KeyCode.Name; keyBtn.TextColor3 = T.accent; listening = false
+                        if cfg.Callback then cfg.Callback(input.KeyCode) end
+                    end
+                end)
+                return box
+            end
+
             return Section
         end
         return Tab
     end
 
+    -- Настраиваемая загрузка с поддержкой callback
+    local LOADING_W, LOADING_H = 460, 260
+    local loadingScreen = mk("Frame", {
+        AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+        Size = UDim2.fromOffset(LOADING_W, LOADING_H), BackgroundColor3 = T.card,
+        ZIndex = 200, ClipsDescendants = true, Parent = gui,
+    })
+    corner(loadingScreen, 22); stroke(loadingScreen, T.stroke, 1.2, 0.55)
+    local loadingScale = mk("UIScale", { Scale = 0.5, Parent = loadingScreen })
+    mk("TextLabel", { Position = UDim2.fromOffset(0, 98), Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, Text = Title, FontFace = FontBold, TextSize = 28, TextColor3 = T.text, ZIndex = 210, Parent = loadingScreen })
+    local loadingSubtitle = mk("TextLabel", { Position = UDim2.fromOffset(0, 136), Size = UDim2.new(1, 0, 0, 18), BackgroundTransparency = 1, Text = "Initializing...", FontFace = FontRegular, TextSize = 13, TextColor3 = T.textDim, ZIndex = 210, Parent = loadingScreen })
+    local progressTrack = mk("Frame", { Position = UDim2.fromOffset(30, 176), Size = UDim2.new(1, -60, 0, 6), BackgroundColor3 = T.stroke, ZIndex = 210, Parent = loadingScreen })
+    corner(progressTrack, 3)
+    local progressFill = mk("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = T.accent, ZIndex = 211, Parent = progressTrack })
+    corner(progressFill, 3)
+
     task.spawn(function()
+        loadingScreen.Visible = true
+        TweenService:Create(loadingScale, Tw.med, { Scale = math.max(math.min(workspace.CurrentCamera.ViewportSize.X/820, 1), 0.55) * 0.85 }):Play()
+        
+        local total = #LoadingStages
+        for i, stage in ipairs(LoadingStages) do
+            loadingSubtitle.Text = stage.text
+            TweenService:Create(progressFill, TweenInfo.new(0.3, Enum.EasingStyle.Quart), { Size = UDim2.fromScale((i / total), 1) }):Play()
+            if stage.callback then
+                pcall(stage.callback)
+            elseif stage.duration then
+                task.wait(stage.duration)
+            end
+        end
+
+        TweenService:Create(loadingScale, Tw.med, { Scale = 0.4 }):Play()
         task.wait(0.2)
+        loadingScreen:Destroy()
         root.Visible = true
     end)
 
