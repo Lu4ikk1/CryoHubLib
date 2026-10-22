@@ -1,11 +1,11 @@
 -- ============================================================
---  CRYOHUB STEAM EDITION — LIBRARY v1.2.0 (Final Fixes)
+--  CRYOHUB STEAM EDITION — LIBRARY v1.3.0 (Final)
 -- ============================================================
 
 local Library = {}
 Library.Flags = {}
 Library.Dependencies = {}
-Library.Version = "1.2.0-Steam"
+Library.Version = "1.3.0-Steam"
 
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
@@ -15,7 +15,7 @@ local player            = Players.LocalPlayer
 local pg                = player:WaitForChild("PlayerGui")
 
 -- ============================================================
---  FONTS
+--  FONTS (OPPO Sans with fallback)
 -- ============================================================
 local function tryFont(weight, fallback)
     local ok, f = pcall(function() return Font.fromName("OPPO Sans", weight, Enum.FontStyle.Normal) end)
@@ -209,7 +209,7 @@ local function processDependencies()
 end
 
 -- ============================================================
---  ROW EDGE ROUNDING & TRACKER
+--  ROW EDGE ROUNDING & TRACKER (Merge logic)
 -- ============================================================
 local function addMasks(row, radius, side)
     local mSize = UDim2.fromOffset(radius, radius)
@@ -243,10 +243,11 @@ local function addMasks(row, radius, side)
 end
 
 local function addRowSeparator(row)
+    -- ✅ Исправлена длина и позиция полосы (идеально по центру)
     local sep = mk("Frame", {
         Name = "__separator",
         AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0),
-        Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = T.stroke,
+        Size = UDim2.new(1, -32, 0, 1), BackgroundColor3 = T.stroke,
         BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = row,
     })
     reg(sep, "BackgroundColor3", "stroke")
@@ -280,7 +281,7 @@ local function attachRowTracker(group, sectionName)
         end
         
         if #rows == 1 then
-            warn("[CryoHub] Секция '" .. tostring(sectionName) .. "' содержит только 1 элемент! Авто-конвертация в одиночную карточку. Добавьте 2+ элемента для создания группы.")
+            -- Авто-конвертация в одиночную карточку
             group.BackgroundTransparency = 1
             local grpStroke = group:FindFirstChildOfClass("UIStroke")
             if grpStroke then grpStroke.Transparency = 1 end
@@ -296,11 +297,13 @@ local function attachRowTracker(group, sectionName)
     end
     
     local function tryTrack(child)
-        if child:IsA("TextButton") or (child:IsA("Frame") and not child:IsA("TextButton")) then
-            if child.LayoutOrder and child.LayoutOrder > 0 then
-                table.insert(rows, child)
-                task.defer(refresh)
-            end
+        -- ✅ Трекаем ТОЛЬКО если указан Merge = true
+        if child:GetAttribute("Merge") == true then
+            table.insert(rows, child)
+            task.defer(refresh)
+        else
+            -- Если элемент одиночный (Merge = false), мы просто обновляем группу, чтобы закрыть предыдущие
+            task.defer(refresh)
         end
     end
     
@@ -534,7 +537,6 @@ function Library:CreateWindow(config)
             mk("TextLabel", { Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = name, FontFace = FontBold, TextSize = 13, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = self._order, Parent = scroll })
             self._order += 1
             
-            -- ✅ УБРАН ClipsDescendants, чтобы UIStroke не обрезался и углы были ровными
             local group = mk("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = self._order, Parent = scroll })
             corner(group, 16); local gs = stroke(group, T.stroke, 1.2, 0.55)
             reg(group, "BackgroundColor3", "card"); reg(gs, "Color", "stroke")
@@ -556,12 +558,16 @@ function Library:CreateWindow(config)
             -- ============= TOGGLE =============
             function Section:CreateToggle(cfg)
                 cfg = cfg or {}
+                local isMerge = cfg.Merge or false
                 local title = cfg.Title or "Toggle"
                 local desc  = cfg.Description
                 local state = cfg.Default or false
                 local callback = cfg.Callback
 
                 local row = mk("TextButton", { Size = UDim2.new(1, 0, 0, desc and 62 or 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, LayoutOrder = nextOrder(), Parent = group })
+                row:SetAttribute("Merge", isMerge) -- ✅ Установка флага слияния
+                if not isMerge then corner(row, 16) end -- Если одиночный, сразу скругляем
+
                 reg(row, "BackgroundColor3", "card")
                 hoverEffect(row, "cardHover", "card")
                 row.MouseEnter:Connect(playHover)
@@ -612,6 +618,7 @@ function Library:CreateWindow(config)
             -- ============= SLIDER =============
             function Section:CreateSlider(cfg)
                 cfg = cfg or {}
+                local isMerge = cfg.Merge or false
                 local title = cfg.Title or "Slider"
                 local min   = cfg.Min or 0
                 local max   = cfg.Max or 100
@@ -619,6 +626,9 @@ function Library:CreateWindow(config)
                 local callback = cfg.Callback
 
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                box:SetAttribute("Merge", isMerge)
+                if not isMerge then corner(box, 16) end
+
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -671,11 +681,15 @@ function Library:CreateWindow(config)
             -- ============= INPUT =============
             function Section:CreateInput(cfg)
                 cfg = cfg or {}
+                local isMerge = cfg.Merge or false
                 local title = cfg.Title or "Input"
                 local placeholder = cfg.Placeholder or ""
                 local callback = cfg.Callback
 
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                box:SetAttribute("Merge", isMerge)
+                if not isMerge then corner(box, 16) end
+
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -709,6 +723,7 @@ function Library:CreateWindow(config)
             local openDropdowns = {}
             function Section:CreateDropdown(cfg)
                 cfg = cfg or {}
+                local isMerge = cfg.Merge or false
                 local title = cfg.Title or "Dropdown"
                 local options = cfg.Options or {}
                 local multi = cfg.Multi or false
@@ -718,7 +733,10 @@ function Library:CreateWindow(config)
                 local optHeight = 40
                 local listHeight = #options * optHeight
 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
+                box:SetAttribute("Merge", isMerge)
+                if not isMerge then corner(box, 16) end
+
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -732,8 +750,8 @@ function Library:CreateWindow(config)
                 local dropLbl = mk("TextLabel", { Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0), BackgroundTransparency = 1, Text = multi and "Select..." or (default or options[1] or ""), FontFace = FontRegular, TextSize = 14, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = dropBtn })
                 reg(dropLbl, "TextColor3", "text")
 
-                -- ✅ УБРАН ClipsDescendants для ровных углов
-                local list = mk("Frame", { Position = UDim2.fromOffset(18, baseHeight), Size = UDim2.new(1, -36, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Parent = box })
+                -- ✅ ClipsDescendants для списка, чтобы при закрытии ничего не вылезало
+                local list = mk("Frame", { Position = UDim2.fromOffset(18, baseHeight), Size = UDim2.new(1, -36, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, ClipsDescendants = true, Parent = box })
                 corner(list, 12); reg(list, "BackgroundColor3", "toggleOff")
                 mk("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
 
@@ -752,7 +770,7 @@ function Library:CreateWindow(config)
 
                 for i, opt in ipairs(options) do
                     local optRow = mk("TextButton", { Size = UDim2.new(1, 0, 0, optHeight), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = i, Parent = list })
-                    if i == 1 or i == #options then corner(optRow, 12) end
+                    if i == 1 or i == #options then corner(optRow, 12) end -- ✅ Скругление крайних опций
                     optRow.MouseEnter:Connect(function() playHover()
                         if not selected[opt] then TweenService:Create(optRow, Tw.fast, { BackgroundColor3 = T.cardHover, BackgroundTransparency = 0 }):Play() end
                     end)
@@ -841,10 +859,14 @@ function Library:CreateWindow(config)
             -- ============= BUTTON =============
             function Section:CreateButton(cfg)
                 cfg = cfg or {}
+                local isMerge = cfg.Merge or false
                 local label = cfg.Title or "Button"
                 local isDanger = cfg.Danger or false
 
                 local btn = mk("TextButton", { Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = T.card, BackgroundTransparency = 0, Text = label, FontFace = FontBold, TextSize = 15, TextColor3 = isDanger and T.red or T.text, AutoButtonColor = false, LayoutOrder = nextOrder(), Parent = group })
+                btn:SetAttribute("Merge", isMerge)
+                if not isMerge then corner(btn, 16) end
+
                 reg(btn, "BackgroundColor3", "card")
                 hoverEffect(btn, "cardHover", "card")
                 btn.MouseEnter:Connect(playHover)
@@ -857,11 +879,15 @@ function Library:CreateWindow(config)
             -- ============= KEYBIND =============
             function Section:CreateKeybind(cfg)
                 cfg = cfg or {}
+                local isMerge = cfg.Merge or false
                 local title = cfg.Title or "Keybind"
                 local default = cfg.Default or Enum.KeyCode.Unknown
                 local callback = cfg.Callback
 
                 local box = mk("Frame", { Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                box:SetAttribute("Merge", isMerge)
+                if not isMerge then corner(box, 16) end
+
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -900,6 +926,7 @@ function Library:CreateWindow(config)
             -- ============= COLOR PICKER =============
             function Section:CreateColorPicker(cfg)
                 cfg = cfg or {}
+                local isMerge = cfg.Merge or false
                 local title = cfg.Title or "Color"
                 local default = cfg.Default or Color3.fromRGB(255, 255, 255)
                 local callback = cfg.Callback
@@ -909,7 +936,10 @@ function Library:CreateWindow(config)
                 
                 local curR, curG, curB = default.R * 255, default.G * 255, default.B * 255
 
-                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group })
+                local box = mk("Frame", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = T.card, BackgroundTransparency = 0, LayoutOrder = nextOrder(), Parent = group, ClipsDescendants = true })
+                box:SetAttribute("Merge", isMerge)
+                if not isMerge then corner(box, 16) end
+
                 reg(box, "BackgroundColor3", "card")
                 hoverEffect(box, "cardHover", "card")
                 box.MouseEnter:Connect(playHover)
@@ -924,7 +954,7 @@ function Library:CreateWindow(config)
                 local clickArea = mk("TextButton", { Size = UDim2.new(1, 0, 0, baseHeight), BackgroundTransparency = 1, Text = "", Parent = box })
                 clickArea.MouseButton1Down:Connect(function() playSound("click") end)
 
-                local panel = mk("Frame", { Position = UDim2.fromOffset(0, baseHeight), Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, Parent = box })
+                local panel = mk("Frame", { Position = UDim2.fromOffset(0, baseHeight), Size = UDim2.new(1, 0, 0, 0), BackgroundColor3 = T.toggleOff, BackgroundTransparency = 0, ClipsDescendants = true, Parent = box })
                 corner(panel, 16); reg(panel, "BackgroundColor3", "toggleOff")
 
                 local ElementObj = { Value = default }
@@ -990,7 +1020,6 @@ function Library:CreateWindow(config)
     end
 
     -- ============ FLOATING BUTTON ============
-    -- ✅ Идеальное выравнивание через UIListLayout
     local floatBtn = mk("TextButton", {
         Name = "FloatToggle", AnchorPoint = Vector2.new(0.5, 0),
         Position = UDim2.new(0.5, 0, 0, 14),
@@ -1060,7 +1089,6 @@ function Library:CreateWindow(config)
         task.delay(0.3, clampRootPosition)
     end)
 
-    -- ✅ Confirmation Overlay (Parent = gui, не обрезается)
     local confirmOverlay = mk("Frame", {
         Name = "ConfirmOverlay", Size = UDim2.fromScale(1, 1),
         BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1,
@@ -1131,7 +1159,6 @@ function Library:CreateWindow(config)
         task.wait(0.05); clampRootPosition()
     end)
 
-    -- Loading Screen
     local LOADING_W, LOADING_H = 460, 260
     local loadingScreen = mk("Frame", {
         AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
