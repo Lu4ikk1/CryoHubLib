@@ -1,5 +1,5 @@
 -- language: Lua, file: CryoHub.lua, target: Roblox Engine
--- *полнофункциональная UI-библиотека, все анимации, panel/window modes, loading screen*
+-- *исправлены все замыкания, полный функционал сохранён*
 
 local CryoHub = {}
 CryoHub.__index = CryoHub
@@ -478,137 +478,138 @@ function CryoHub.new(config)
     end
 
     function self:AddTab(id, label, icon)
-        local tabObj = { Window = self, ID = id }
+        local window = self
+        local tabObj = { Window = window, ID = id }
         local item = mk("TextButton", {
-            Name = "Item_" .. id, Size = UDim2.new(1, 0, 0, self.IsPanelMode and 38 or 46),
-            BackgroundColor3 = self.T.sidebar, BackgroundTransparency = self.IsPanelMode and 0 or 1,
-            Text = "", AutoButtonColor = false, LayoutOrder = #self.SidebarItems + 1,
-            Parent = self.IsPanelMode and self.TabStrip or self.SidebarScroll,
+            Name = "Item_" .. id, Size = UDim2.new(1, 0, 0, window.IsPanelMode and 38 or 46),
+            BackgroundColor3 = window.T.sidebar, BackgroundTransparency = window.IsPanelMode and 0 or 1,
+            Text = "", AutoButtonColor = false, LayoutOrder = #window.SidebarItems + 1,
+            Parent = window.IsPanelMode and window.TabStrip or window.SidebarScroll,
         })
-        corner(item, self.IsPanelMode and 19 or 23); press(item)
+        corner(item, window.IsPanelMode and 19 or 23); press(item)
         
         local ico = mk("ImageLabel", {
-            Name = "Icon", Position = UDim2.fromOffset(self.IsPanelMode and 10 or 18, self.IsPanelMode and 11 or 12),
-            Size = UDim2.fromOffset(self.IsPanelMode and 16 or 22, self.IsPanelMode and 16 or 22),
-            BackgroundTransparency = 1, Image = icon or ICONS.Toggle, ImageColor3 = self.T.textDim, Parent = item,
+            Name = "Icon", Position = UDim2.fromOffset(window.IsPanelMode and 10 or 18, window.IsPanelMode and 11 or 12),
+            Size = UDim2.fromOffset(window.IsPanelMode and 16 or 22, window.IsPanelMode and 16 or 22),
+            BackgroundTransparency = 1, Image = icon or ICONS.Toggle, ImageColor3 = window.T.textDim, Parent = item,
         })
         local lbl = mk("TextLabel", {
-            Name = "Label", Position = UDim2.fromOffset(self.IsPanelMode and 30 or 54, 0),
-            Size = UDim2.new(1, -(self.IsPanelMode and 34 or 66), 1, 0), BackgroundTransparency = 1,
-            Text = label, TextColor3 = self.T.textDim, Font = Enum.Font.GothamMedium,
-            TextSize = self.IsPanelMode and 12 or 14, TextXAlignment = Enum.TextXAlignment.Left, Parent = item,
+            Name = "Label", Position = UDim2.fromOffset(window.IsPanelMode and 30 or 54, 0),
+            Size = UDim2.new(1, -(window.IsPanelMode and 34 or 66), 1, 0), BackgroundTransparency = 1,
+            Text = label, TextColor3 = window.T.textDim, Font = Enum.Font.GothamMedium,
+            TextSize = window.IsPanelMode and 12 or 14, TextXAlignment = Enum.TextXAlignment.Left, Parent = item,
         })
         
         item.MouseEnter:Connect(function()
             playHover()
-            if self.CurrentTab ~= id then
-                TweenService:Create(item, Tw.fast, { BackgroundColor3 = self.T.cardHover, BackgroundTransparency = 0 }):Play()
+            if window.CurrentTab ~= id then
+                TweenService:Create(item, Tw.fast, { BackgroundColor3 = window.T.cardHover, BackgroundTransparency = 0 }):Play()
             end
         end)
         item.MouseLeave:Connect(function()
-            if self.CurrentTab ~= id then
-                TweenService:Create(item, Tw.fast, { BackgroundTransparency = self.IsPanelMode and 0 or 1 }):Play()
+            if window.CurrentTab ~= id then
+                TweenService:Create(item, Tw.fast, { BackgroundTransparency = window.IsPanelMode and 0 or 1 }):Play()
             end
         end)
         item.MouseButton1Down:Connect(function() playSound("click") end)
         
-        self.SidebarItems[id] = { btn = item, ico = ico, lbl = lbl, baseColor = self.T.content }
+        window.SidebarItems[id] = { btn = item, ico = ico, lbl = lbl, baseColor = window.T.content }
 
         local page = mk("CanvasGroup", {
             Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1,
-            GroupTransparency = 1, Visible = false, Parent = self.Content,
+            GroupTransparency = 1, Visible = false, Parent = window.Content,
         })
         local scroll = mk("ScrollingFrame", {
             Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0,
-            ScrollBarThickness = 4, ScrollBarImageColor3 = self.T.stroke, ScrollBarImageTransparency = 0.4,
+            ScrollBarThickness = 4, ScrollBarImageColor3 = window.T.stroke, ScrollBarImageTransparency = 0.4,
             CanvasSize = UDim2.new(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y,
             ScrollingDirection = Enum.ScrollingDirection.Y, Parent = page,
         })
-        local padH = self.IsPanelMode and 18 or 26
+        local padH = window.IsPanelMode and 18 or 26
         mk("UIPadding", {
             PaddingTop = UDim.new(0, 22), PaddingBottom = UDim.new(0, 22),
             PaddingLeft = UDim.new(0, padH), PaddingRight = UDim.new(0, padH - 4), Parent = scroll,
         })
         mk("UIListLayout", { Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder, Parent = scroll })
         
-        self.Pages[id] = { Page = page, Scroll = scroll }
-        item.MouseButton1Click:Connect(function() self:SwitchTab(id) end)
+        window.Pages[id] = { Page = page, Scroll = scroll }
+        item.MouseButton1Click:Connect(function() window:SwitchTab(id) end)
 
-        function tabObj:AddSection(text)
+        tabObj.AddSection = function(text)
             local lbl = mk("TextLabel", {
                 Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = text,
-                Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = self.T.accent,
+                Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = window.T.accent,
                 TextXAlignment = Enum.TextXAlignment.Left, Parent = scroll,
             })
-            table.insert(self.Regs, { el = lbl, prop = "TextColor3", key = "accent" })
+            table.insert(window.Regs, { el = lbl, prop = "TextColor3", key = "accent" })
         end
 
-        function tabObj:AddGroup()
-            local group = { Window = self, Scroll = scroll }
+        tabObj.AddGroup = function()
+            local group = { Window = window, Scroll = scroll }
             local groupFrame = mk("CanvasGroup", {
                 Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-                BackgroundColor3 = self.T.card, BackgroundTransparency = 0,
+                BackgroundColor3 = window.T.card, BackgroundTransparency = 0,
                 ClipsDescendants = true, Parent = scroll,
             })
             corner(groupFrame, 16)
-            local grpStroke = stroke(groupFrame, self.T.stroke, 1.2, 0.55)
-            table.insert(self.Regs, { el = groupFrame, prop = "BackgroundColor3", key = "card" })
-            table.insert(self.Regs, { el = grpStroke, prop = "Color", key = "stroke" })
+            local grpStroke = stroke(groupFrame, window.T.stroke, 1.2, 0.55)
+            table.insert(window.Regs, { el = groupFrame, prop = "BackgroundColor3", key = "card" })
+            table.insert(window.Regs, { el = grpStroke, prop = "Color", key = "stroke" })
             mk("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder, Parent = groupFrame })
 
             local function addSep(row)
                 local sep = mk("Frame", {
                     AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, 0),
-                    Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = self.T.stroke,
+                    Size = UDim2.new(1, -36, 0, 1), BackgroundColor3 = window.T.stroke,
                     BackgroundTransparency = 0.7, BorderSizePixel = 0, ZIndex = 2, Parent = row,
                 })
-                table.insert(self.Regs, { el = sep, prop = "BackgroundColor3", key = "stroke" })
+                table.insert(window.Regs, { el = sep, prop = "BackgroundColor3", key = "stroke" })
             end
 
-            function group:AddToggle(title, desc, initialState)
+            group.AddToggle = function(title, desc, initialState)
                 local row = mk("TextButton", {
-                    Size = UDim2.new(1, 0, 0, desc and 62 or 52), BackgroundColor3 = self.T.card,
+                    Size = UDim2.new(1, 0, 0, desc and 62 or 52), BackgroundColor3 = window.T.card,
                     BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = groupFrame,
                 })
-                table.insert(self.Regs, { el = row, prop = "BackgroundColor3", key = "card" })
-                hoverEffect(row, self.T.cardHover, self.T.card)
+                table.insert(window.Regs, { el = row, prop = "BackgroundColor3", key = "card" })
+                hoverEffect(row, window.T.cardHover, window.T.card)
                 row.MouseEnter:Connect(playHover); row.MouseButton1Down:Connect(function() playSound("click") end)
 
                 local name = mk("TextLabel", {
                     Position = UDim2.fromOffset(18, desc and 10 or 0), Size = UDim2.new(1, -110, 0, desc and 22 or 52),
                     BackgroundTransparency = 1, Text = title, Font = Enum.Font.GothamMedium, TextSize = 15,
-                    TextColor3 = self.T.text, TextXAlignment = Enum.TextXAlignment.Left,
+                    TextColor3 = window.T.text, TextXAlignment = Enum.TextXAlignment.Left,
                     TextYAlignment = desc and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center, Parent = row,
                 })
-                table.insert(self.Regs, { el = name, prop = "TextColor3", key = "text" })
+                table.insert(window.Regs, { el = name, prop = "TextColor3", key = "text" })
 
                 if desc then
                     local d = mk("TextLabel", {
                         Position = UDim2.fromOffset(18, 34), Size = UDim2.new(1, -110, 0, 18),
                         BackgroundTransparency = 1, Text = desc, Font = Enum.Font.Gotham, TextSize = 12,
-                        TextColor3 = self.T.textDim, TextXAlignment = Enum.TextXAlignment.Left, Parent = row,
+                        TextColor3 = window.T.textDim, TextXAlignment = Enum.TextXAlignment.Left, Parent = row,
                     })
-                    table.insert(self.Regs, { el = d, prop = "TextColor3", key = "textDim" })
+                    table.insert(window.Regs, { el = d, prop = "TextColor3", key = "textDim" })
                 end
 
                 local track = mk("Frame", {
                     AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -18, 0.5, 0),
-                    Size = UDim2.fromOffset(50, 26), BackgroundColor3 = self.T.toggleOff,
+                    Size = UDim2.fromOffset(50, 26), BackgroundColor3 = window.T.toggleOff,
                     BackgroundTransparency = 0, Parent = row,
                 })
-                corner(track, 13); table.insert(self.Regs, { el = track, prop = "BackgroundColor3", key = "toggleOff" })
+                corner(track, 13); table.insert(window.Regs, { el = track, prop = "BackgroundColor3", key = "toggleOff" })
 
                 local knob = mk("Frame", {
                     AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromOffset(3, 0) + UDim2.fromScale(0, 0.5),
-                    Size = UDim2.fromOffset(20, 20), BackgroundColor3 = self.T.toggleKnobOff,
+                    Size = UDim2.fromOffset(20, 20), BackgroundColor3 = window.T.toggleKnobOff,
                     BackgroundTransparency = 0, Parent = track,
                 })
-                corner(knob, 10); table.insert(self.Regs, { el = knob, prop = "BackgroundColor3", key = "toggleKnobOff" })
+                corner(knob, 10); table.insert(window.Regs, { el = knob, prop = "BackgroundColor3", key = "toggleKnobOff" })
 
                 local toggled = initialState or false
                 if toggled then
-                    track.BackgroundColor3 = self.T.accent
-                    knob.BackgroundColor3 = self.T.toggleKnobOn
+                    track.BackgroundColor3 = window.T.accent
+                    knob.BackgroundColor3 = window.T.toggleKnobOn
                     knob.Position = UDim2.fromOffset(27, 0) + UDim2.fromScale(0, 0.5)
                 end
 
@@ -616,13 +617,13 @@ function CryoHub.new(config)
                 row.MouseButton1Click:Connect(function()
                     toggled = not toggled
                     if toggled then
-                        TweenService:Create(track, Tw.fast, { BackgroundColor3 = self.T.accent }):Play()
-                        TweenService:Create(knob, Tw.fast, { BackgroundColor3 = self.T.toggleKnobOn, Position = UDim2.fromOffset(27, 0) + UDim2.fromScale(0, 0.5) }):Play()
-                        self:Notify(title, "Enabled", ICONS.Check)
+                        TweenService:Create(track, Tw.fast, { BackgroundColor3 = window.T.accent }):Play()
+                        TweenService:Create(knob, Tw.fast, { BackgroundColor3 = window.T.toggleKnobOn, Position = UDim2.fromOffset(27, 0) + UDim2.fromScale(0, 0.5) }):Play()
+                        window:Notify(title, "Enabled", ICONS.Check)
                     else
-                        TweenService:Create(track, Tw.fast, { BackgroundColor3 = self.T.toggleOff }):Play()
-                        TweenService:Create(knob, Tw.fast, { BackgroundColor3 = self.T.toggleKnobOff, Position = UDim2.fromOffset(3, 0) + UDim2.fromScale(0, 0.5) }):Play()
-                        self:Notify(title, "Disabled", ICONS.Check)
+                        TweenService:Create(track, Tw.fast, { BackgroundColor3 = window.T.toggleOff }):Play()
+                        TweenService:Create(knob, Tw.fast, { BackgroundColor3 = window.T.toggleKnobOff, Position = UDim2.fromOffset(3, 0) + UDim2.fromScale(0, 0.5) }):Play()
+                        window:Notify(title, "Disabled", ICONS.Check)
                     end
                     if callback then callback(toggled) end
                 end)
@@ -632,10 +633,10 @@ function CryoHub.new(config)
                     SetValue = function(val)
                         toggled = val
                         if toggled then
-                            TweenService:Create(track, Tw.fast, { BackgroundColor3 = self.T.accent }):Play()
+                            TweenService:Create(track, Tw.fast, { BackgroundColor3 = window.T.accent }):Play()
                             TweenService:Create(knob, Tw.fast, { Position = UDim2.fromOffset(27, 0) + UDim2.fromScale(0, 0.5) }):Play()
                         else
-                            TweenService:Create(track, Tw.fast, { BackgroundColor3 = self.T.toggleOff }):Play()
+                            TweenService:Create(track, Tw.fast, { BackgroundColor3 = window.T.toggleOff }):Play()
                             TweenService:Create(knob, Tw.fast, { Position = UDim2.fromOffset(3, 0) + UDim2.fromScale(0, 0.5) }):Play()
                         end
                         if callback then callback(toggled) end
@@ -644,54 +645,54 @@ function CryoHub.new(config)
                 }
             end
 
-            function group:AddSlider(title, min, max, default)
+            group.AddSlider = function(title, min, max, default)
                 local box = mk("Frame", {
-                    Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = self.T.card,
+                    Size = UDim2.new(1, 0, 0, 76), BackgroundColor3 = window.T.card,
                     BackgroundTransparency = 0, Parent = groupFrame,
                 })
-                table.insert(self.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
-                hoverEffect(box, self.T.cardHover, self.T.card); box.MouseEnter:Connect(playHover)
+                table.insert(window.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
+                hoverEffect(box, window.T.cardHover, window.T.card); box.MouseEnter:Connect(playHover)
 
                 local name = mk("TextLabel", {
                     Position = UDim2.fromOffset(18, 14), Size = UDim2.new(1, -110, 0, 20),
                     BackgroundTransparency = 1, Text = title, Font = Enum.Font.GothamMedium,
-                    TextSize = 15, TextColor3 = self.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
+                    TextSize = 15, TextColor3 = window.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
                 })
-                table.insert(self.Regs, { el = name, prop = "TextColor3", key = "text" })
+                table.insert(window.Regs, { el = name, prop = "TextColor3", key = "text" })
 
                 local valLbl = mk("TextLabel", {
                     AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -18, 0, 14),
                     Size = UDim2.fromOffset(70, 20), BackgroundTransparency = 1,
                     Text = tostring(default), Font = Enum.Font.GothamBold, TextSize = 14,
-                    TextColor3 = self.T.accent, TextXAlignment = Enum.TextXAlignment.Right, Parent = box,
+                    TextColor3 = window.T.accent, TextXAlignment = Enum.TextXAlignment.Right, Parent = box,
                 })
-                table.insert(self.Regs, { el = valLbl, prop = "TextColor3", key = "accent" })
+                table.insert(window.Regs, { el = valLbl, prop = "TextColor3", key = "accent" })
 
                 local trackBg = mk("Frame", {
                     Position = UDim2.fromOffset(18, 52), Size = UDim2.new(1, -36, 0, 6),
-                    BackgroundColor3 = self.T.toggleOff, BackgroundTransparency = 0, Parent = box,
+                    BackgroundColor3 = window.T.toggleOff, BackgroundTransparency = 0, Parent = box,
                 })
-                corner(trackBg, 3); table.insert(self.Regs, { el = trackBg, prop = "BackgroundColor3", key = "toggleOff" })
+                corner(trackBg, 3); table.insert(window.Regs, { el = trackBg, prop = "BackgroundColor3", key = "toggleOff" })
 
                 local fill = mk("Frame", {
                     Size = UDim2.fromScale((default - min) / (max - min), 1),
-                    BackgroundColor3 = self.T.accent, BackgroundTransparency = 0, Parent = trackBg,
+                    BackgroundColor3 = window.T.accent, BackgroundTransparency = 0, Parent = trackBg,
                 })
-                corner(fill, 3); table.insert(self.Regs, { el = fill, prop = "BackgroundColor3", key = "accent" })
+                corner(fill, 3); table.insert(window.Regs, { el = fill, prop = "BackgroundColor3", key = "accent" })
 
                 local knob = mk("Frame", {
                     AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale((default - min) / (max - min), 0.5),
-                    Size = UDim2.fromOffset(22, 22), BackgroundColor3 = self.T.accent,
+                    Size = UDim2.fromOffset(22, 22), BackgroundColor3 = window.T.accent,
                     BackgroundTransparency = 0, Parent = trackBg,
                 })
-                corner(knob, 11); table.insert(self.Regs, { el = knob, prop = "BackgroundColor3", key = "accent" })
+                corner(knob, 11); table.insert(window.Regs, { el = knob, prop = "BackgroundColor3", key = "accent" })
 
                 local knobInner = mk("Frame", {
                     AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-                    Size = UDim2.fromOffset(8, 8), BackgroundColor3 = self.T.accentBright,
+                    Size = UDim2.fromOffset(8, 8), BackgroundColor3 = window.T.accentBright,
                     BackgroundTransparency = 0, Parent = knob,
                 })
-                corner(knobInner, 4); table.insert(self.Regs, { el = knobInner, prop = "BackgroundColor3", key = "accentBright" })
+                corner(knobInner, 4); table.insert(window.Regs, { el = knobInner, prop = "BackgroundColor3", key = "accentBright" })
 
                 local dragging = false
                 local lastValue = default
@@ -721,7 +722,7 @@ function CryoHub.new(config)
                 end)
                 UserInputService.InputEnded:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        if dragging then dragging = false; self:Notify(title, "Value: " .. tostring(lastValue), ICONS.Slider) end
+                        if dragging then dragging = false; window:Notify(title, "Value: " .. tostring(lastValue), ICONS.Slider) end
                     end
                 end)
                 addSep(box)
@@ -739,37 +740,37 @@ function CryoHub.new(config)
                 }
             end
 
-            function group:AddInput(title, placeholder)
+            group.AddInput = function(title, placeholder)
                 local box = mk("Frame", {
-                    Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = self.T.card,
+                    Size = UDim2.new(1, 0, 0, 80), BackgroundColor3 = window.T.card,
                     BackgroundTransparency = 0, Parent = groupFrame,
                 })
-                table.insert(self.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
-                hoverEffect(box, self.T.cardHover, self.T.card); box.MouseEnter:Connect(playHover)
+                table.insert(window.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
+                hoverEffect(box, window.T.cardHover, window.T.card); box.MouseEnter:Connect(playHover)
 
                 local name = mk("TextLabel", {
                     Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20),
                     BackgroundTransparency = 1, Text = title, Font = Enum.Font.GothamMedium,
-                    TextSize = 15, TextColor3 = self.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
+                    TextSize = 15, TextColor3 = window.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
                 })
-                table.insert(self.Regs, { el = name, prop = "TextColor3", key = "text" })
+                table.insert(window.Regs, { el = name, prop = "TextColor3", key = "text" })
 
                 local field = mk("Frame", {
                     Position = UDim2.fromOffset(18, 36), Size = UDim2.new(1, -36, 0, 34),
-                    BackgroundColor3 = self.T.toggleOff, BackgroundTransparency = 0, Parent = box,
+                    BackgroundColor3 = window.T.toggleOff, BackgroundTransparency = 0, Parent = box,
                 })
-                corner(field, 12); stroke(field, self.T.stroke, 1, 0.6)
-                table.insert(self.Regs, { el = field, prop = "BackgroundColor3", key = "toggleOff" })
+                corner(field, 12); stroke(field, window.T.stroke, 1, 0.6)
+                table.insert(window.Regs, { el = field, prop = "BackgroundColor3", key = "toggleOff" })
 
                 local textBox = mk("TextBox", {
                     Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0),
                     BackgroundTransparency = 1, Text = "", PlaceholderText = placeholder,
-                    PlaceholderColor3 = self.T.textDim, TextColor3 = self.T.text,
+                    PlaceholderColor3 = window.T.textDim, TextColor3 = window.T.text,
                     Font = Enum.Font.Gotham, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left,
                     ClearTextOnFocus = false, Parent = field,
                 })
-                table.insert(self.Regs, { el = textBox, prop = "TextColor3", key = "text" })
-                table.insert(self.Regs, { el = textBox, prop = "PlaceholderColor3", key = "textDim" })
+                table.insert(window.Regs, { el = textBox, prop = "TextColor3", key = "text" })
+                table.insert(window.Regs, { el = textBox, prop = "PlaceholderColor3", key = "textDim" })
 
                 local callback = nil
                 field.InputBegan:Connect(function(input)
@@ -786,7 +787,7 @@ function CryoHub.new(config)
                 }
             end
 
-            function group:AddDropdown(title, options, opts)
+            group.AddDropdown = function(title, options, opts)
                 opts = opts or {}
                 local multi = opts.multi or false
                 local baseHeight = 76
@@ -794,40 +795,40 @@ function CryoHub.new(config)
                 local listHeight = #options * optHeight
 
                 local box = mk("Frame", {
-                    Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = self.T.card,
+                    Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = window.T.card,
                     BackgroundTransparency = 0, Parent = groupFrame,
                 })
-                table.insert(self.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
-                hoverEffect(box, self.T.cardHover, self.T.card); box.MouseEnter:Connect(playHover)
+                table.insert(window.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
+                hoverEffect(box, window.T.cardHover, window.T.card); box.MouseEnter:Connect(playHover)
 
                 local name = mk("TextLabel", {
                     Position = UDim2.fromOffset(18, 10), Size = UDim2.new(1, 0, 0, 20),
                     BackgroundTransparency = 1, Text = title, Font = Enum.Font.GothamMedium,
-                    TextSize = 15, TextColor3 = self.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
+                    TextSize = 15, TextColor3 = window.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
                 })
-                table.insert(self.Regs, { el = name, prop = "TextColor3", key = "text" })
+                table.insert(window.Regs, { el = name, prop = "TextColor3", key = "text" })
 
                 local dropBtn = mk("TextButton", {
                     Position = UDim2.fromOffset(18, 36), Size = UDim2.new(1, -36, 0, 34),
-                    BackgroundColor3 = self.T.toggleOff, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = box,
+                    BackgroundColor3 = window.T.toggleOff, BackgroundTransparency = 0, Text = "", AutoButtonColor = false, Parent = box,
                 })
-                corner(dropBtn, 12); stroke(dropBtn, self.T.stroke, 1, 0.6)
-                table.insert(self.Regs, { el = dropBtn, prop = "BackgroundColor3", key = "toggleOff" })
+                corner(dropBtn, 12); stroke(dropBtn, window.T.stroke, 1, 0.6)
+                table.insert(window.Regs, { el = dropBtn, prop = "BackgroundColor3", key = "toggleOff" })
 
                 local dropLbl = mk("TextLabel", {
                     Position = UDim2.fromOffset(14, 0), Size = UDim2.new(1, -28, 1, 0),
                     BackgroundTransparency = 1, Text = multi and "Select..." or options[1],
-                    Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = self.T.text,
+                    Font = Enum.Font.Gotham, TextSize = 14, TextColor3 = window.T.text,
                     TextXAlignment = Enum.TextXAlignment.Left, Parent = dropBtn,
                 })
-                table.insert(self.Regs, { el = dropLbl, prop = "TextColor3", key = "text" })
+                table.insert(window.Regs, { el = dropLbl, prop = "TextColor3", key = "text" })
 
                 local list = mk("Frame", {
                     Position = UDim2.fromOffset(18, baseHeight), Size = UDim2.new(1, -36, 0, 0),
-                    BackgroundColor3 = self.T.toggleOff, BackgroundTransparency = 0,
+                    BackgroundColor3 = window.T.toggleOff, BackgroundTransparency = 0,
                     ClipsDescendants = true, Parent = box,
                 })
-                corner(list, 12); table.insert(self.Regs, { el = list, prop = "BackgroundColor3", key = "toggleOff" })
+                corner(list, 12); table.insert(window.Regs, { el = list, prop = "BackgroundColor3", key = "toggleOff" })
                 mk("UIListLayout", { Padding = UDim.new(0, 0), SortOrder = Enum.SortOrder.LayoutOrder, Parent = list })
 
                 local selected = {}
@@ -843,26 +844,26 @@ function CryoHub.new(config)
 
                 for i, opt in ipairs(options) do
                     local optRow = mk("TextButton", {
-                        Size = UDim2.new(1, 0, 0, optHeight), BackgroundColor3 = self.T.card,
+                        Size = UDim2.new(1, 0, 0, optHeight), BackgroundColor3 = window.T.card,
                         BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = i, Parent = list,
                     })
-                    optRow.MouseEnter:Connect(function() playHover(); TweenService:Create(optRow, Tw.fast, { BackgroundColor3 = self.T.cardHover, BackgroundTransparency = 0 }):Play() end)
+                    optRow.MouseEnter:Connect(function() playHover(); TweenService:Create(optRow, Tw.fast, { BackgroundColor3 = window.T.cardHover, BackgroundTransparency = 0 }):Play() end)
                     optRow.MouseLeave:Connect(function() TweenService:Create(optRow, Tw.fast, { BackgroundTransparency = 1 }):Play() end)
                     optRow.MouseButton1Down:Connect(function() playSound("click") end)
 
                     local lbl = mk("TextLabel", {
                         Position = UDim2.fromOffset(16, 0), Size = UDim2.new(1, -56, 1, 0),
                         BackgroundTransparency = 1, Text = opt, Font = Enum.Font.Gotham,
-                        TextSize = 14, TextColor3 = self.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = optRow,
+                        TextSize = 14, TextColor3 = window.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = optRow,
                     })
-                    table.insert(self.Regs, { el = lbl, prop = "TextColor3", key = "text" })
+                    table.insert(window.Regs, { el = lbl, prop = "TextColor3", key = "text" })
 
                     local check = mk("TextLabel", {
                         Name = "Check", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0),
                         Size = UDim2.fromOffset(18, 18), BackgroundTransparency = 1, Text = "✓",
-                        Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = self.T.accent, Visible = false, Parent = optRow,
+                        Font = Enum.Font.GothamBold, TextSize = 16, TextColor3 = window.T.accent, Visible = false, Parent = optRow,
                     })
-                    table.insert(self.Regs, { el = check, prop = "TextColor3", key = "accent" })
+                    table.insert(window.Regs, { el = check, prop = "TextColor3", key = "accent" })
                     optionRows[opt] = optRow
                     if not multi and i == 1 then selected[opt] = true; check.Visible = true end
 
@@ -876,16 +877,16 @@ function CryoHub.new(config)
                             table.sort(parts)
                             dropLbl.Text = #parts > 0 and table.concat(parts, ", ") or "Select..."
                             if callback then callback(parts) end
-                            self:Notify(title, #parts > 0 and "Selected: " .. table.concat(parts, ", ") or "Cleared", ICONS.Check)
+                            window:Notify(title, #parts > 0 and "Selected: " .. table.concat(parts, ", ") or "Cleared", ICONS.Check)
                         else
                             for k in pairs(selected) do selected[k] = nil end
                             selected[opt] = true
                             updateSelectionVisual()
                             dropLbl.Text = opt
                             if callback then callback(opt) end
-                            self:Notify(title, "Selected: " .. opt, ICONS.Check)
+                            window:Notify(title, "Selected: " .. opt, ICONS.Check)
                             task.defer(function()
-                                for i2, dd in ipairs(self.OpenDropdowns) do
+                                for i2, dd in ipairs(window.OpenDropdowns) do
                                     if dd.box == box then dd.close(); break end
                                 end
                             end)
@@ -899,8 +900,8 @@ function CryoHub.new(config)
                     isOpen = false
                     TweenService:Create(list, Tw.fast, { Size = UDim2.new(1, -36, 0, 0) }):Play()
                     TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
-                    for i, dd in ipairs(self.OpenDropdowns) do
-                        if dd.box == box then table.remove(self.OpenDropdowns, i); break end
+                    for i, dd in ipairs(window.OpenDropdowns) do
+                        if dd.box == box then table.remove(window.OpenDropdowns, i); break end
                     end
                 end
 
@@ -910,7 +911,7 @@ function CryoHub.new(config)
                         isOpen = true
                         TweenService:Create(list, Tw.med, { Size = UDim2.new(1, -36, 0, listHeight) }):Play()
                         TweenService:Create(box, Tw.med, { Size = UDim2.new(1, 0, 0, baseHeight + listHeight) }):Play()
-                        table.insert(self.OpenDropdowns, { box = box, btn = dropBtn, list = list, close = closeDrop })
+                        table.insert(window.OpenDropdowns, { box = box, btn = dropBtn, list = list, close = closeDrop })
                     end
                 end)
                 addSep(box)
@@ -938,30 +939,30 @@ function CryoHub.new(config)
                 }
             end
 
-            function group:AddKeybind(title, defaultKey)
+            group.AddKeybind = function(title, defaultKey)
                 local box = mk("Frame", {
-                    Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = self.T.card,
+                    Size = UDim2.new(1, 0, 0, 60), BackgroundColor3 = window.T.card,
                     BackgroundTransparency = 0, Parent = groupFrame,
                 })
-                table.insert(self.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
-                hoverEffect(box, self.T.cardHover, self.T.card); box.MouseEnter:Connect(playHover)
+                table.insert(window.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
+                hoverEffect(box, window.T.cardHover, window.T.card); box.MouseEnter:Connect(playHover)
 
                 local name = mk("TextLabel", {
                     Position = UDim2.fromOffset(18, 0), Size = UDim2.new(1, -150, 1, 0),
                     BackgroundTransparency = 1, Text = title, Font = Enum.Font.GothamMedium,
-                    TextSize = 15, TextColor3 = self.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
+                    TextSize = 15, TextColor3 = window.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
                 })
-                table.insert(self.Regs, { el = name, prop = "TextColor3", key = "text" })
+                table.insert(window.Regs, { el = name, prop = "TextColor3", key = "text" })
 
                 local keyBtn = mk("TextButton", {
                     AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -18, 0.5, 0),
-                    Size = UDim2.fromOffset(100, 34), BackgroundColor3 = self.T.toggleOff,
+                    Size = UDim2.fromOffset(100, 34), BackgroundColor3 = window.T.toggleOff,
                     BackgroundTransparency = 0, Text = defaultKey and defaultKey.Name or "None",
-                    Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = self.T.accent,
+                    Font = Enum.Font.GothamBold, TextSize = 13, TextColor3 = window.T.accent,
                     AutoButtonColor = false, Parent = box,
                 })
-                corner(keyBtn, 17); table.insert(self.Regs, { el = keyBtn, prop = "BackgroundColor3", key = "toggleOff" })
-                table.insert(self.Regs, { el = keyBtn, prop = "TextColor3", key = "accent" })
+                corner(keyBtn, 17); table.insert(window.Regs, { el = keyBtn, prop = "BackgroundColor3", key = "toggleOff" })
+                table.insert(window.Regs, { el = keyBtn, prop = "TextColor3", key = "accent" })
                 keyBtn.MouseButton1Down:Connect(function() playSound("click") end)
 
                 local listening = false
@@ -972,7 +973,7 @@ function CryoHub.new(config)
                     if listening then return end
                     listening = true
                     keyBtn.Text = "Press..."
-                    keyBtn.TextColor3 = self.T.textDim
+                    keyBtn.TextColor3 = window.T.textDim
                 end)
 
                 UserInputService.InputBegan:Connect(function(input, gpe)
@@ -980,9 +981,9 @@ function CryoHub.new(config)
                     if input.UserInputType == Enum.UserInputType.Keyboard then
                         currentKey = input.KeyCode
                         keyBtn.Text = input.KeyCode.Name
-                        keyBtn.TextColor3 = self.T.accent
+                        keyBtn.TextColor3 = window.T.accent
                         listening = false
-                        self:Notify(title, "Keybind: " .. input.KeyCode.Name, ICONS.Keybind)
+                        window:Notify(title, "Keybind: " .. input.KeyCode.Name, ICONS.Keybind)
                         if callback then callback(input.KeyCode) end
                     end
                 end)
@@ -992,14 +993,14 @@ function CryoHub.new(config)
                     SetValue = function(key)
                         currentKey = key
                         keyBtn.Text = key and key.Name or "None"
-                        keyBtn.TextColor3 = self.T.accent
+                        keyBtn.TextColor3 = window.T.accent
                         if callback then callback(key) end
                     end,
                     OnChanged = function(cb) callback = cb end
                 }
             end
 
-            function group:AddColorPicker(title, defaultColor, callback)
+            group.AddColorPicker = function(title, defaultColor, callback)
                 local baseHeight = 80
                 local sliderRowHeight = 44
                 local padding = 12
@@ -1011,32 +1012,32 @@ function CryoHub.new(config)
                 local currentColor = defaultColor
 
                 local box = mk("Frame", {
-                    Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = self.T.card,
+                    Size = UDim2.new(1, 0, 0, baseHeight), BackgroundColor3 = window.T.card,
                     BackgroundTransparency = 0, Parent = groupFrame,
                 })
-                table.insert(self.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
-                hoverEffect(box, self.T.cardHover, self.T.card); box.MouseEnter:Connect(playHover)
+                table.insert(window.Regs, { el = box, prop = "BackgroundColor3", key = "card" })
+                hoverEffect(box, window.T.cardHover, window.T.card); box.MouseEnter:Connect(playHover)
 
                 local swatchBg = mk("Frame", {
                     Position = UDim2.fromOffset(18, 18), Size = UDim2.fromOffset(44, 44),
                     BackgroundColor3 = defaultColor, BackgroundTransparency = 0, Parent = box,
                 })
-                corner(swatchBg, 12); stroke(swatchBg, self.T.stroke, 1, 0.4)
+                corner(swatchBg, 12); stroke(swatchBg, window.T.stroke, 1, 0.4)
 
                 local name = mk("TextLabel", {
                     Position = UDim2.fromOffset(76, 18), Size = UDim2.new(1, -140, 0, 22),
                     BackgroundTransparency = 1, Text = title, Font = Enum.Font.GothamBold,
-                    TextSize = 15, TextColor3 = self.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
+                    TextSize = 15, TextColor3 = window.T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
                 })
-                table.insert(self.Regs, { el = name, prop = "TextColor3", key = "text" })
+                table.insert(window.Regs, { el = name, prop = "TextColor3", key = "text" })
 
                 local hexLbl = mk("TextLabel", {
                     Position = UDim2.fromOffset(76, 40), Size = UDim2.new(1, -140, 0, 18),
                     BackgroundTransparency = 1, Text = "RGB: 255, 80, 80",
-                    Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = self.T.textDim,
+                    Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = window.T.textDim,
                     TextXAlignment = Enum.TextXAlignment.Left, Parent = box,
                 })
-                table.insert(self.Regs, { el = hexLbl, prop = "TextColor3", key = "textDim" })
+                table.insert(window.Regs, { el = hexLbl, prop = "TextColor3", key = "textDim" })
 
                 local clickArea = mk("TextButton", {
                     Size = UDim2.new(1, 0, 0, baseHeight), BackgroundTransparency = 1, Text = "", Parent = box,
@@ -1045,10 +1046,10 @@ function CryoHub.new(config)
 
                 local panel = mk("Frame", {
                     Position = UDim2.fromOffset(0, baseHeight), Size = UDim2.new(1, 0, 0, 0),
-                    BackgroundColor3 = self.T.toggleOff, BackgroundTransparency = 0,
+                    BackgroundColor3 = window.T.toggleOff, BackgroundTransparency = 0,
                     ClipsDescendants = true, Parent = box,
                 })
-                corner(panel, 14); table.insert(self.Regs, { el = panel, prop = "BackgroundColor3", key = "toggleOff" })
+                corner(panel, 14); table.insert(window.Regs, { el = panel, prop = "BackgroundColor3", key = "toggleOff" })
 
                 local function updateColor()
                     currentColor = Color3.fromRGB(math.floor(currentR), math.floor(currentG), math.floor(currentB))
@@ -1076,7 +1077,7 @@ function CryoHub.new(config)
                     })
                     local track = mk("Frame", {
                         Position = UDim2.fromOffset(0, 30), Size = UDim2.new(1, 0, 0, 6),
-                        BackgroundColor3 = self.T.stroke, BackgroundTransparency = 0.5, Parent = row,
+                        BackgroundColor3 = window.T.stroke, BackgroundTransparency = 0.5, Parent = row,
                     })
                     corner(track, 3)
 
@@ -1135,7 +1136,7 @@ function CryoHub.new(config)
                     else
                         TweenService:Create(panel, Tw.fast, { Size = UDim2.new(1, 0, 0, 0) }):Play()
                         TweenService:Create(box, Tw.fast, { Size = UDim2.new(1, 0, 0, baseHeight) }):Play()
-                        self:Notify(title, string.format("RGB: %d, %d, %d", math.floor(currentR), math.floor(currentG), math.floor(currentB)), ICONS.Color)
+                        window:Notify(title, string.format("RGB: %d, %d, %d", math.floor(currentR), math.floor(currentG), math.floor(currentB)), ICONS.Color)
                     end
                 end)
                 addSep(box)
@@ -1149,15 +1150,15 @@ function CryoHub.new(config)
                 }
             end
 
-            function group:AddButton(label, isDanger, onClick)
+            group.AddButton = function(label, isDanger, onClick)
                 local btn = mk("TextButton", {
-                    Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = self.T.card,
+                    Size = UDim2.new(1, 0, 0, 52), BackgroundColor3 = window.T.card,
                     BackgroundTransparency = 0, Text = label, Font = Enum.Font.GothamBold,
-                    TextSize = 15, TextColor3 = isDanger and self.T.red or self.T.text,
+                    TextSize = 15, TextColor3 = isDanger and window.T.red or window.T.text,
                     AutoButtonColor = false, Parent = groupFrame,
                 })
-                table.insert(self.Regs, { el = btn, prop = "BackgroundColor3", key = "card" })
-                hoverEffect(btn, self.T.cardHover, self.T.card)
+                table.insert(window.Regs, { el = btn, prop = "BackgroundColor3", key = "card" })
+                hoverEffect(btn, window.T.cardHover, window.T.card)
                 btn.MouseEnter:Connect(playHover); btn.MouseButton1Down:Connect(function() playSound("click") end)
                 if onClick then btn.MouseButton1Click:Connect(onClick) end
                 addSep(btn)
